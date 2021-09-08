@@ -1,0 +1,85 @@
+plugins {
+    id 'java'
+    id 'groovy'
+    id 'eclipse'
+}
+
+compileJava.options.encoding = 'UTF-8'
+
+
+group = 'ua.net.nlp'
+version="2.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+
+dependencies {
+    implementation group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.8'
+//    implementation group: 'org.codehaus.groovy', name: 'groovy-json', version: '3.0.8'
+    implementation group: 'org.codehaus.groovy', name: 'groovy-xml', version: '3.0.8'
+//    implementation group: 'org.codehaus.groovy', name: 'groovy-cli-picocli', version: '3.0.8'
+//    implementation group: 'info.picocli', name: 'picocli', version: '4.6.1'
+
+//    implementation group:'ch.qos.logback', name:'logback-classic', version:'1.2.3'
+
+    implementation("org.languagetool:language-uk:$ltUkVersion") {
+        exclude module: 'hunspell'
+        exclude module: 'language-detector'
+        exclude module: 'lucene-core'
+        exclude group: 'org.apache.lucene'
+        exclude group: 'io.grpc'
+    }
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.+'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.+'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(11)
+    }
+}
+
+sourceSets {
+    main {
+        resources {
+//            srcDir "src/main/groovy"
+            srcDir "src"
+//            include "**/*.groovy"
+//            includes = ["**/tools/*.md", "*.groovy", "**/*.txt"]
+        }
+    }
+}
+
+
+compileGroovy {
+    groovyOptions.forkOptions.jvmArgs = [ '-Dgroovy.grape.enable=false' ]
+}
+
+
+eclipse {
+  classpath {
+    defaultOutputDir = file('build')
+  }
+}
+
+
+test {
+    useJUnitPlatform()
+    jvmArgs '-Dgroovy.grape.enable=false'
+}
+
+
+task run(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+//    main = "ua.net.nlp_uk.ubertext.MongoDriver"
+    main = "ConvertToXml"
+
+    jvmArgs '-Dgroovy.grape.enable=false'
+
+  //  args "--properties", propFile
+}
+
