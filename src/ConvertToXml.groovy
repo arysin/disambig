@@ -45,7 +45,9 @@ static final Pattern LATIN_WORD_PATTERN = Pattern.compile(/\p{IsLatin}+/)
 @Field
 List<String> xmlElems = []
 
-new File("txt").eachFileRecurse(FILES) { File file->
+List<File> files = new File("txt").listFiles().sort { it.name }
+
+files.each() { File file->
 //    if( ! (file.name =~ /^[A-ZА-ЯІЇЄҐ]_.*/) ) {
 //        println "Skipping ${file.name}..."
 //        return
@@ -77,10 +79,11 @@ new File("txt").eachFileRecurse(FILES) { File file->
             .join("\n+")
 
         regex = "(?m)^<S>\\h*\n+$regex\$".replace('<S>\\h*\n+<b>', '(<S>\\h*\n+<b>|<b>\\h*\n+<S>)') \
+            .replace('<S>\\h*\n+<i>', '(<S>\\h*\n+<i>|<i>\\h*\n+<S>)')
             .replace('<S>\\h*\n+<emphasis>', '(<S>\\h*\n+<emphasis>|<emphasis>\\h*\n+<S>)')
         if( ! (text =~ regex) ) {
             println "No match: $regex"
-            System.exit 1 
+            return 
         }
         text = text.replaceFirst(regex, '<P/>\n$0')
     }
@@ -410,8 +413,8 @@ List<List<String>> getParagraphs(String filename) {
     //        List<String> tokenized = sentTokenizer.tokenize(file.text);
     
     //    def text = file.text.replaceFirst(/(?s)<body>(.*)<\/body>/, '$1')
-    def text = file.text.replaceFirst(/(?s).*?<body>(.*)<\/body>/, '$1')
-    def m = text =~ /(?m)^(?!(?:<b>|\(<i>)[а-яіїєґ])([^—\h-].{1,50})/
+    def text = file.text.replaceFirst(/(?s).*?<body>(.*)<\/body>.*/, '$1')
+    def m = text =~ /(?m)(?<![:;]\n)^(?!(?:<b>|\(<i>|[1-9]\)\h*|[•■]\h*)[а-яіїєґ])([^\u2014\u2013\u2212\h-].{1,50})/
     
 //    def inFile = new File("txt", file.name.replaceFirst(/\.txt$/, '_dis.txt'))
 //    def outFile = new File("txt3", inFile.name)
@@ -421,17 +424,18 @@ List<List<String>> getParagraphs(String filename) {
         println "Single paragraph"
         return []
     }
-    
-    def paras = m[1..-1].collect {
-        def sent = it[1].replace("Врешті-таки", "Врешті - таки")
-        def words = wordTokenizer.tokenize(sent)
-        words = words.findAll { ! (it =~ /\h+/) && it != '\n' }
-        words = words.take(3)
-        if( words[1] == "." ) words = words.take(2)
-//        println words.join("|") + "\n---"
-        words
+    else {
+        def paras = m[1..-1].collect {
+            def sent = it[1].replace("Врешті-таки", "Врешті - таки")
+            def words = wordTokenizer.tokenize(sent)
+            words = words.findAll { ! (it =~ /\h+/) && it != '\n' }
+            words = words.take(3)
+            if( words[1] ==~ /[.?…!]|\.\.\./ ) words = words.take(2)
+    //        println words.join("|") + "\n---"
+            words
+        }
+        
+        println "Found ${paras.size()} paragraphs"
+        return paras
     }
-    
-    println "Found ${paras.size()} paragraphs"
-    paras
 }
