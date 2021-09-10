@@ -70,6 +70,7 @@ files.each() { File file->
     def paragraphs = getParagraphs(srcTxtName)
     
     def text = file.text
+    text = text.replace('<P/>', '').replace('\u2019', "'")
     
     paragraphs.each { List<String> tokens ->
         String regex = tokens.collect{ 
@@ -87,6 +88,9 @@ files.each() { File file->
         }
         text = text.replaceFirst(regex, '<P/>\n$0')
     }
+    text = text.replaceAll(/<P\/>(\n<P\/>)+/, '<P/>')
+    
+    text = text.replaceAll(/^\u2014.*\n[А-ЯІЇЄҐ]/, '<br>$0')
     
 //    System.exit 1
     
@@ -98,8 +102,14 @@ files.each() { File file->
     xmlElems = []
     
     boolean start = false
+    String prevLineT = ""
+    String prevLine = ""
+    
     text.eachLine { String line ->
         lineCount++
+        
+        prevLine = prevLineT
+        prevLineT = line
 
         if( ! start ) {
             def isBody = line.startsWith('<body>') 
@@ -137,7 +147,7 @@ files.each() { File file->
             return
         }
         if( trimmed.length() < 12 ) {
-            def m1 = trimmed =~ /^([.…?!]{1,3}|[:;«»"”)])\[<\/S>\]\s*$/
+            def m1 = trimmed =~ /^([.…?!]{1,3}|[:;«»"\u201C\u201D()—])\[<\/S>\]\s*$/
             if( m1 ) {
                 String value = XmlUtil.escapeXml(m1[0][1])
                 xmlFile << "  <token value=\"$value\" lemma=\"$value\" tags=\"punct\" />\n"
@@ -197,8 +207,15 @@ files.each() { File file->
 //            xmlFile << "  ---multi---\n"
             return
         }
-
-        def m = trimmed =~ /(.+?)\[(.+?)\/([^0-9].*?)\]/
+        
+        if( line =~ /^[•■]/ && prevLine =~ /^[:;]\[/ ) {
+            xmlFile << "<format tag=\"br\"/>\n"
+        }
+//        else if( line =~ /^\u2014/ ) {
+//            xmlFile << "<format tag=\"br\"/>\n"
+//        }
+        
+        def m = trimmed =~ /(.+?)\[(.+?)\/([a-z].*?)\]/
         
         if( ! m ) {
             parseFailues << "Failed to parse: \"$line\" (${file.name})"
@@ -208,7 +225,7 @@ files.each() { File file->
 
         m.each { mt ->
             if( mt.size() < 3 ) {
-                println "failed to parse2: \"$line\""
+                println "ERROR: failed to parse2: \"$line\""
                 return
             }
             
@@ -238,7 +255,7 @@ files.each() { File file->
                 if( allTags == "null" ) {
     
                     if( LATIN_WORD_PATTERN.matcher(token).matches() ) {
-                        tags = "noninfl:foreign"
+                        tags = "unclass"
                     }
                     else {
                         nullTags << token
@@ -246,7 +263,7 @@ files.each() { File file->
                     }
     
                 }
-                else if( ! allTags  .startsWith("noninfl") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
+                else if( ! allTags.startsWith("noninfl") && ! allTags.startsWith("unclass") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
                     AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
                     def ltTags2 = ltTags.getReadings().collect { AnalyzedToken t -> t.getLemma() + "/" + t.getPOSTag() }
                     allTagsList.each { tagPair ->
@@ -283,8 +300,26 @@ files.each() { File file->
                 // hopefully we don't need to encode apostrophe
                 String tokenEnc = token =~ /["<>]/ ? XmlUtil.escapeXml(token) : token
                 String lemmaEnc = lemma =~ /["<>]/ ? XmlUtil.escapeXml(lemma) : lemma
-                xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
     
+                if( allTagsList.size() > 1 ) {
+                    xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr>\n"
+                    xmlFile << "    <alts>\n"
+                    allTagsList[1..-1].each { tkn -> 
+                        println ":: '$tkn'"
+                        (lemma, tags) = tkn.split("/") 
+                        tagsEnc = XmlUtil.escapeXml(tags)
+                        // hopefully we don't need to encode apostrophe
+                        lemmaEnc = lemma =~ /["<>]/ ? XmlUtil.escapeXml(lemma) : lemma
+                        xmlFile << "      <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
+                    }
+                    xmlFile << "    </alts>\n"
+                    xmlFile << "  </token>"
+                }
+                else {
+                    xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
+                }
+                
+                
                 String tagPos = tags.replaceFirst(/:.*/, '')
             
                 if( ! (lemma in ambigs) )
@@ -345,7 +380,7 @@ freqs2
     .toSorted { a, b -> coll.compare a.key, b.key }
     .each { k,v ->
         v.each { k2,v2 ->
-            outFile2 << k.padRight(30) << " " << k2.padRight(30) << " " << v2 << "\n"
+            outFileFreqFull << k.padRight(30) << " " << k2.padRight(30) << " " << v2 << "\n"
         }
     }
 
@@ -410,11 +445,8 @@ List<List<String>> getParagraphs(String filename) {
     
     def file = new File("good", filename)
     
-    //        List<String> tokenized = sentTokenizer.tokenize(file.text);
-    
-    //    def text = file.text.replaceFirst(/(?s)<body>(.*)<\/body>/, '$1')
     def text = file.text.replaceFirst(/(?s).*?<body>(.*)<\/body>.*/, '$1')
-    def m = text =~ /(?m)(?<![:;]\n)^(?!(?:<b>|\(<i>|[1-9]\)\h*|[•■]\h*)[а-яіїєґ])([^\u2014\u2013\u2212\h-].{1,50})/
+    def m = text =~ /(?m)(?<![:;]\n)^(?!(?:<b>|\(<i>|[1-9]\)\h*|[•■]\h*)[а-яіїєґ])([^\u2014\u2013\u2212-].{1,100})/
     
 //    def inFile = new File("txt", file.name.replaceFirst(/\.txt$/, '_dis.txt'))
 //    def outFile = new File("txt3", inFile.name)
@@ -429,8 +461,9 @@ List<List<String>> getParagraphs(String filename) {
             def sent = it[1].replace("Врешті-таки", "Врешті - таки")
             def words = wordTokenizer.tokenize(sent)
             words = words.findAll { ! (it =~ /\h+/) && it != '\n' }
-            words = words.take(3)
-            if( words[1] ==~ /[.?…!]|\.\.\./ ) words = words.take(2)
+            words = words.take(6)
+            int idx = words.findIndexOf{ it ==~ /[.?…!]|[.?!]{2,3}/ }
+            if( idx >=0 && idx < 5 ) words = words.take(idx+1)
     //        println words.join("|") + "\n---"
             words
         }
