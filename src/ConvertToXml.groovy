@@ -29,14 +29,14 @@ int multiWordCount = 0
 int multiTagCount = 0
 int nullTagCount = 0
 boolean sentence = false
-def unverified = []
+//def unverified = []
 def nullTags = []
 @Field
-def titles = [:].withDefault { [] }
+//def titles = [:].withDefault { [] }
 def parseFailues = []
 
-@Field @Lazy
-UkrainianTagger ukTagger = { new UkrainianTagger() }()
+//@Field @Lazy
+//UkrainianTagger ukTagger = { new UkrainianTagger() }()
 
 @Field 
 static final Pattern PUNCT_PATTERN = Pattern.compile(/[\p{Punct}«»„“…—–]+/)
@@ -90,7 +90,9 @@ files.each() { File file->
     }
     text = text.replaceAll(/<P\/>(\n<P\/>)+/, '<P/>')
     
-    text = text.replaceAll(/^\u2014.*\n[А-ЯІЇЄҐ]/, '<br>$0')
+//    text = text.replaceAll(/^\u2014.*\n[А-ЯІЇЄҐ]/, '<br>$0')
+    text = text.replaceAll(/<S>\h*\n([•■])/, '<br>\n<S>\n$1')
+    text = text.replaceAll(/<S>\h*\n([\u2014])/, '<br>\n<S>\n$1')
     
 //    System.exit 1
     
@@ -208,9 +210,9 @@ files.each() { File file->
             return
         }
         
-        if( line =~ /^[•■]/ && prevLine =~ /^[:;]\[/ ) {
-            xmlFile << "<format tag=\"br\"/>\n"
-        }
+//        if( line =~ /^[•■]/ && prevLine =~ /^[:;]\[/ ) {
+//            xmlFile << "<format tag=\"br\"/>\n"
+//        }
 //        else if( line =~ /^\u2014/ ) {
 //            xmlFile << "<format tag=\"br\"/>\n"
 //        }
@@ -264,22 +266,22 @@ files.each() { File file->
     
                 }
                 else if( ! allTags.startsWith("noninfl") && ! allTags.startsWith("unclass") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
-                    AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
-                    def ltTags2 = ltTags.getReadings().collect { AnalyzedToken t -> t.getLemma() + "/" + t.getPOSTag() }
-                    allTagsList.each { tagPair ->
-                        if( tagPair.endsWith("noninfl:foreign") ) {
-                        }
-                        else {
-                            if( ! tagPair.contains("/") ) {
-                                tagPair = lemma + "/" +tagPair
-                            }
-                            if( ! (tagPair in ltTags2) ) {
-                                unverified << "$tagPair (token: $token) (avail: $ltTags2)"
-                                //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
-                                return
-                            }
-                        }
-                    }
+//                    AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
+//                    def ltTags2 = ltTags.getReadings().collect { AnalyzedToken t -> t.getLemma() + "/" + t.getPOSTag() }
+//                    allTagsList.each { tagPair ->
+//                        if( tagPair.endsWith("noninfl:foreign") ) {
+//                        }
+//                        else {
+//                            if( ! tagPair.contains("/") ) {
+//                                tagPair = lemma + "/" +tagPair
+//                            }
+//                            if( ! (tagPair in ltTags2) ) {
+//                                unverified << "$tagPair (token: $token) (avail: $ltTags2)"
+//                                //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
+//                                return
+//                            }
+//                        }
+//                    }
                 }
             }
 
@@ -346,7 +348,7 @@ println "$wordCount word/number tokens"
 println "$multiWordCount multiword tags !!"
 println "$multiTagCount tokens with multiple tags !!"
 println "$nullTagCount tokens with null tags !!"
-println "${unverified.size()} tokens with unverified tags !!"
+//println "${unverified.size()} tokens with unverified tags !!"
 
 freqs = freqs.toSorted { - it.value }
 
@@ -384,7 +386,7 @@ freqs2
         }
     }
 
-new File("err_unverified.txt").text = unverified.collect{ it.toString() }.toSorted(coll).join("\n")
+//new File("err_unverified.txt").text = unverified.collect{ it.toString() }.toSorted(coll).join("\n")
 
 def nullTagsFile = new File("err_null_tags.txt")
 nullTagsFile.text = nullTags.collect{ it.toString() }.toSorted(coll).join("\n")
@@ -392,8 +394,8 @@ nullTagsFile.text = nullTags.collect{ it.toString() }.toSorted(coll).join("\n")
 def parseFailuresFile = new File("err_parse_failures.txt")
 parseFailuresFile.text = parseFailues.collect{ it.toString() }.toSorted(coll).join("\n")
 
-def dupsFile = new File("err_dups.txt")
-dupsFile.text = titles.findAll { k,v -> v.size() > 1 }.collect{ k,v -> "$k\n\t"+ v.join("\n\t") }.join("\n")
+//def dupsFile = new File("err_dups.txt")
+//dupsFile.text = titles.findAll { k,v -> v.size() > 1 }.collect{ k,v -> "$k\n\t"+ v.join("\n\t") }.join("\n")
 
 
 void handleHeader(String line, File xmlFile) {
@@ -422,10 +424,10 @@ void handleHeader(String line, File xmlFile) {
     if( ! m || m[0].size() < 3 )
         println "Failed to parse: $line"
         
-    if( m[0][1] == "<title>" ) {
-        String title = m[0][2].trim()
-        titles[title] << xmlFile.name
-    }
+//    if( m[0][1] == "<title>" ) {
+//        String title = m[0][2].trim()
+//        titles[title] << xmlFile.name
+//    }
         
     String textEnc = XmlUtil.escapeXml(m[0][2])
     xmlFile << "  " << m[0][1] << textEnc << m[0][3] << "\n"

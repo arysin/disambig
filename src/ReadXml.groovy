@@ -1,5 +1,7 @@
 #!/bin/env groovy
 
+@Grab(group='org.languagetool', module='language-uk', version='5.5-SNAPSHOT')
+
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 import groovy.xml.slurpersupport.GPathResult
@@ -25,6 +27,10 @@ class Stats {
     def parseFailues = []
     def freqs = [:].withDefault{ 0 }
     def freqs2 = [:].withDefault{ [:].withDefault { 0 } }
+    def words = [:].withDefault{ 0 }
+    def wordsNorm = [:].withDefault{ 0 }
+    def lemmas = [:].withDefault{ 0 }
+    def pos1Freq = [:].withDefault{ 0 }
 }
 @Field
 static final Pattern PUNCT_PATTERN = Pattern.compile(/[\p{Punct}«»„“…—–]+/)
@@ -192,6 +198,17 @@ private void printNode(File txtFile, GPathResult xml, int childIdx) {
     prevChild = xml
 }
 
+@CompileStatic
+static String normalize(String token, String lemma) {
+    if( ! lemma || lemma =~ /^[А-ЯІЇЄҐ]([а-яіїєґ'-]|$)/ )
+        return token
+    return token.toLowerCase()
+}
+
+@CompileStatic
+static String keyPos(String tags) {
+     tags.replaceFirst(/:.*/, '')
+}
 
 void validateToken(xml) {
     String tags = xml.@tags
@@ -203,8 +220,14 @@ void validateToken(xml) {
         return
     }
 
+    stats.pos1Freq[keyPos(tags)]++
+    
+    
     if( lemma =~ /(?iu)^[а-яіїєґ]/ ) {
         stats.count++
+        stats.words[token]++
+        stats.wordsNorm[normalize(token, lemma)]++
+        stats.lemmas[lemma]++
     }
     if( lemma =~ /(?iu)^[а-яіїєґa-z0-9]/ ) {
         stats.wordCount++
@@ -226,7 +249,8 @@ void validateToken(xml) {
             if( tags.startsWith("noninfl:foreign") || tags.startsWith("unclass") ) {
             }
             else {
-                if( ! (tagPair in ltTags2) ) {
+                boolean initials = token ==~ /[А-ЯІЇЄҐ]\./ && tagPair ==~ /[А-ЯІЇЄҐ]\.\/noun:anim:[mf]:v_...:nv:prop:.name:abbr/ 
+                if( ! (tagPair in ltTags2) && ! initials ) {
                     stats.unverified << "$tagPair (token: $token) (avail: $ltTags2)"
                     //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
                     return
@@ -252,6 +276,11 @@ void writeStats() {
     
     println "$count Ukrainian tokens"
     println "$wordCount word/number tokens"
+    println "${words.size()} unique Ukrainian words"
+    println "${wordsNorm.size()} unique Ukrainian words (case-insensitive)"
+    println "${lemmas.size()} unique lemmas"
+//    println "Tag freqs:\n" + pos1Freq.sort{k,v -> -v}.collect{k,v -> k.padRight(25) + " $v"}.join("\n")
+    
 //    println "$multiWordCount multiword tags !!"
     println "$multiTagCount tokens with multiple tags !!"
     println "$nullTagCount tokens with null tags !!"
