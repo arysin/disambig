@@ -33,9 +33,11 @@ class Stats {
     def pos1Freq = [:].withDefault{ 0 }
 }
 @Field
-static final Pattern PUNCT_PATTERN = Pattern.compile(/[\p{Punct}«»„“…—–]+/)
+static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()«»„“"'…\u2013\u2014\u201D\u201C-]+/)
 @Field
-static final Pattern LATIN_WORD_PATTERN = Pattern.compile(/\p{IsLatin}+/)
+static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2070-\u209F\u20A0-\u20CF\u2100-\u214F\u2150-\u218F\u2200-\u22FF]+/)
+@Field
+static final Pattern UNKNOWN_PATTERN = Pattern.compile(/(.*-)?[а-яіїєґА-ЯІЇЄҐ]+(-.*)?/)
 
 @Field
 Stats stats = new Stats()

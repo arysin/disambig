@@ -38,10 +38,14 @@ def parseFailues = []
 //@Field @Lazy
 //UkrainianTagger ukTagger = { new UkrainianTagger() }()
 
+//@Field 
+//static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()«»„“"…\u2013\u2014-]+/)
+//@Field 
+//static final Pattern LATIN_WORD_PATTERN = Pattern.compile(/\p{IsLatin}+/)
 @Field 
-static final Pattern PUNCT_PATTERN = Pattern.compile(/[\p{Punct}«»„“…—–]+/)
+static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2070-\u209F\u20A0-\u20CF\u2100-\u214F\u2150-\u218F\u2200-\u22FF]+/)
 @Field 
-static final Pattern LATIN_WORD_PATTERN = Pattern.compile(/\p{IsLatin}+/)
+static final Pattern UNKNOWN_PATTERN = Pattern.compile(/(.*-)?[а-яіїєґА-ЯІЇЄҐ]+(-.*)?/)
 @Field
 List<String> xmlElems = []
 
@@ -106,6 +110,7 @@ files.each() { File file->
     boolean start = false
     String prevLineT = ""
     String prevLine = ""
+    boolean inForeign
     
     text.eachLine { String line ->
         lineCount++
@@ -149,7 +154,7 @@ files.each() { File file->
             return
         }
         if( trimmed.length() < 12 ) {
-            def m1 = trimmed =~ /^([.…?!]{1,3}|[:;«»"\u201C\u201D()—])\[<\/S>\]\s*$/
+            def m1 = trimmed =~ /^([,.:;!?\/()«»„“"'…\u2013\u2014\u201D\u201C-]+)\[<\/S>\]\s*$/
             if( m1 ) {
                 String value = XmlUtil.escapeXml(m1[0][1])
                 xmlFile << "  <token value=\"$value\" lemma=\"$value\" tags=\"punct\" />\n"
@@ -195,9 +200,15 @@ files.each() { File file->
 //            else {
 //                xmlElems << trimmed[1..<-1]
 //            }
+            if( trimmed == "<foreign>" )
+                inForeign = true
+            else if( trimmed == "</foreign>" )
+                inForeign = false
+            
             return
         }
-        
+
+                
         if( ! sentence ) {
             xmlFile << "<sentence>\n"
             sentence = true
@@ -256,14 +267,19 @@ files.each() { File file->
                 wordCount++
                 if( allTags == "null" ) {
     
-                    if( LATIN_WORD_PATTERN.matcher(token).matches() ) {
-                        tags = "unclass"
+                    if( SYMBOL_PATTERN.matcher(token).matches() ) {
+                        tags = "symb"
                     }
-                    else {
+                    else if( UNKNOWN_PATTERN.matcher(token).matches() ) {
+                        tags = "unknown"
                         nullTags << token
                         nullTagCount++
                     }
-    
+                    else {
+                        tags = "unclass"
+                        nullTags << token
+                        nullTagCount++
+                    }
                 }
                 else if( ! allTags.startsWith("noninfl") && ! allTags.startsWith("unclass") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
 //                    AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
