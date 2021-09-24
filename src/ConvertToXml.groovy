@@ -15,35 +15,31 @@ import groovy.xml.XmlUtil
 
 import groovy.transform.Field
 
-def freqs = [:].withDefault{ 0 }
-def freqs2 = [:].withDefault{ [:].withDefault { 0 } }
-
-// only collect lemmas which are ambiguous
-def ambigs = new File("lemma_ambig_freq.txt").readLines().collect{ it.split("\t")[1] }
 
 def xmlFolder = new File("xml")
 
-int count = 0
+@Field
+int ukWordCount = 0
+@Field
 int wordCount = 0
-int multiWordCount = 0
+//int multiWordCount = 0
+@Field
 int multiTagCount = 0
+@Field
 int nullTagCount = 0
 boolean sentence = false
 //def unverified = []
+@Field
 def nullTags = []
 @Field
 //def titles = [:].withDefault { [] }
 def parseFailues = []
 
-//@Field @Lazy
-//UkrainianTagger ukTagger = { new UkrainianTagger() }()
 
-//@Field 
-//static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()«»„“"…\u2013\u2014-]+/)
-//@Field 
-//static final Pattern LATIN_WORD_PATTERN = Pattern.compile(/\p{IsLatin}+/)
 @Field 
-static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2070-\u209F\u20A0-\u20CF\u2100-\u214F\u2150-\u218F\u2200-\u22FF]+/)
+static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()\[\]{}«»„“"'…\u2013\u2014\u201D\u201C•■♦-]+/)
+@Field 
+static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2000-\u20CF\u2100-\u218F\u2200-\u22FF]+/)
 @Field 
 static final Pattern UNKNOWN_PATTERN = Pattern.compile(/(.*-)?[а-яіїєґА-ЯІЇЄҐ]+(-.*)?/)
 @Field
@@ -215,139 +211,20 @@ files.each() { File file->
             xmlElems << "S"
         }
         
-        if( line =~ /\/<[a-z]+>\]/ ) {
-            multiWordCount++
+//        if( line =~ /\/<[a-z]+>\]/ ) {
+//            multiWordCount++
 //            xmlFile << "  ---multi---\n"
-            return
-        }
-        
+//            return
+//        }
+//        
 //        if( line =~ /^[•■]/ && prevLine =~ /^[:;]\[/ ) {
 //            xmlFile << "<format tag=\"br\"/>\n"
 //        }
 //        else if( line =~ /^\u2014/ ) {
 //            xmlFile << "<format tag=\"br\"/>\n"
 //        }
-        
-        def m = trimmed =~ /(.+?)\[(.+?)\/([a-z].*?)\]/
-        
-        if( ! m ) {
-            parseFailues << "Failed to parse: \"$line\" (${file.name})"
-//            System.err.println "${file.name}\nFailed to parse: \"$line\""
-            return
-        }
 
-        m.each { mt ->
-            if( mt.size() < 3 ) {
-                println "ERROR: failed to parse2: \"$line\""
-                return
-            }
-            
-            String token = mt[1]
-            String lemma = mt[2]
-            String allTags = mt[3]
-            
-    //        if( ! (line =~ /(?iu)^[а-яіїєґ]/) )
-    //            return
-    
-            if( allTags.contains(",") ) {
-                multiTagCount++
-            }
-            String[] allTagsList = allTags.split(",")
-            tags = allTagsList[0]
-            
-            if( ! (tags ==~ /[a-z_0-9:&]+/) ) {
-                println "Invalid tag: $tags"
-                return
-            }
-
-            if( lemma =~ /(?iu)^[а-яіїєґ]/ ) {
-                count++
-            }
-            if( lemma =~ /(?iu)^[а-яіїєґa-z0-9]/ ) {
-                wordCount++
-                if( allTags == "null" ) {
-    
-                    if( SYMBOL_PATTERN.matcher(token).matches() ) {
-                        tags = "symb"
-                    }
-                    else if( UNKNOWN_PATTERN.matcher(token).matches() ) {
-                        tags = "unknown"
-                        nullTags << token
-                        nullTagCount++
-                    }
-                    else {
-                        tags = "unclass"
-                        nullTags << token
-                        nullTagCount++
-                    }
-                }
-                else if( ! allTags.startsWith("noninfl") && ! allTags.startsWith("unclass") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
-//                    AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
-//                    def ltTags2 = ltTags.getReadings().collect { AnalyzedToken t -> t.getLemma() + "/" + t.getPOSTag() }
-//                    allTagsList.each { tagPair ->
-//                        if( tagPair.endsWith("noninfl:foreign") ) {
-//                        }
-//                        else {
-//                            if( ! tagPair.contains("/") ) {
-//                                tagPair = lemma + "/" +tagPair
-//                            }
-//                            if( ! (tagPair in ltTags2) ) {
-//                                unverified << "$tagPair (token: $token) (avail: $ltTags2)"
-//                                //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
-//                                return
-//                            }
-//                        }
-//                    }
-                }
-            }
-
-            String commentAttr = ""
-            
-            def mComment = (trimmed =~ /\]\s+([^\h].+)$/)
-            if( mComment ) {
-                commentAttr = "comment=\"" + XmlUtil.escapeXml(mComment[0][1]) + "\" "
-            } 
-            
-    
-            if( token ==~ /([.…?!]{1,3}|[,:;%«»"“”\/()&\u2013\u2014-])/ ) {
-                String tokenEnc = XmlUtil.escapeXml(token)
-                xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$tokenEnc\" tags=\"punct\" />\n"
-            }
-            else {
-                String tagsEnc = XmlUtil.escapeXml(tags)
-                // hopefully we don't need to encode apostrophe
-                String tokenEnc = token =~ /["<>]/ ? XmlUtil.escapeXml(token) : token
-                String lemmaEnc = lemma =~ /["<>]/ ? XmlUtil.escapeXml(lemma) : lemma
-    
-                if( allTagsList.size() > 1 ) {
-                    xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr>\n"
-                    xmlFile << "    <alts>\n"
-                    allTagsList[1..-1].each { tkn -> 
-                        println ":: '$tkn'"
-                        (lemma, tags) = tkn.split("/") 
-                        tagsEnc = XmlUtil.escapeXml(tags)
-                        // hopefully we don't need to encode apostrophe
-                        lemmaEnc = lemma =~ /["<>]/ ? XmlUtil.escapeXml(lemma) : lemma
-                        xmlFile << "      <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
-                    }
-                    xmlFile << "    </alts>\n"
-                    xmlFile << "  </token>"
-                }
-                else {
-                    xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
-                }
-                
-                
-                String tagPos = tags.replaceFirst(/:.*/, '')
-            
-                if( ! (lemma in ambigs) )
-                    return
-    
-                freqs[lemma] += 1
-                freqs2[token][lemma+"/"+tagPos] += 1
-            }
-
-        } // each match
+        processTaggedItem(trimmed, file, xmlFile, inForeign)
         
         def endingM = trimmed =~ /\]\s?([.,:;«»"”\/?!)]|[!?.]{3})(\[$1\/null\])?\h*$/
         if( endingM ) {
@@ -359,50 +236,17 @@ files.each() { File file->
     xmlFile << "</body>\n</text>\n"
 }
 
-println "$count Ukrainian tokens"
+println "$ukWordCount Ukrainian tokens"
 println "$wordCount word/number tokens"
-println "$multiWordCount multiword tags !!"
+//println "$multiWordCount multiword tags !!"
 println "$multiTagCount tokens with multiple tags !!"
 println "$nullTagCount tokens with null tags !!"
 //println "${unverified.size()} tokens with unverified tags !!"
 
-freqs = freqs.toSorted { - it.value }
-
-def outFile = new File("lemma_freqs.txt")
-outFile.text = ""
-
-freqs.each { k,v ->
-    outFile << "$v\t$k\n"
-}
-
-def outFile2 = new File("lemma_freqs_hom.txt")
-outFile2.text = ""
 
 java.text.Collator coll = java.text.Collator.getInstance(new Locale("uk", "UA"));
 coll.setStrength(java.text.Collator.IDENTICAL)
 coll.setDecomposition(java.text.Collator.NO_DECOMPOSITION)
-
-freqs2
-    .findAll{ k,v -> v.size() > 1 }
-    .toSorted { a, b -> coll.compare a.key, b.key }
-    .each { k,v ->
-        v.each { k2,v2 -> 
-            outFile2 << k.padRight(30) << " " << k2.padRight(30) << " " << v2 << "\n"
-        }
-    }
-
-def outFileFreqFull = new File("lemma_freqs_full.txt")
-outFileFreqFull.text = ""
-
-freqs2
-    .toSorted { a, b -> coll.compare a.key, b.key }
-    .each { k,v ->
-        v.each { k2,v2 ->
-            outFileFreqFull << k.padRight(30) << " " << k2.padRight(30) << " " << v2 << "\n"
-        }
-    }
-
-//new File("err_unverified.txt").text = unverified.collect{ it.toString() }.toSorted(coll).join("\n")
 
 def nullTagsFile = new File("err_null_tags.txt")
 nullTagsFile.text = nullTags.collect{ it.toString() }.toSorted(coll).join("\n")
@@ -489,4 +333,109 @@ List<List<String>> getParagraphs(String filename) {
         println "Found ${paras.size()} paragraphs"
         return paras
     }
+}
+
+
+void processTaggedItem(String trimmed, File file, File xmlFile, boolean inForeign) {
+    def m = trimmed =~ /(.+?)\[(.+?)\/([a-z].*?)\]/
+    
+    if( ! m ) {
+        parseFailues << "Failed to parse: \"$trimmed\" (${file.name})"
+//            System.err.println "${file.name}\nFailed to parse: \"$line\""
+        return
+    }
+
+    if( inForeign ) {
+        String value = m[0][1]
+        xmlFile << "  <token value=\"$value\" lemma=\"$value\" tags=\"unclass\" />\n"
+        return
+    }
+
+    m.each { mt ->
+        if( mt.size() < 3 ) {
+            println "ERROR: failed to parse2: \"$trimmed\""
+            return
+        }
+        
+        String token = mt[1]
+        String lemma = mt[2]
+        String allTags = mt[3]
+        
+//        if( ! (line =~ /(?iu)^[а-яіїєґ]/) )
+//            return
+
+        if( allTags.contains(",") ) {
+            multiTagCount++
+        }
+        String[] allTagsList = allTags.split(",")
+        tags = allTagsList[0]
+        
+        if( ! (tags ==~ /[a-z_0-9:&]+/) ) {
+            println "Invalid tag: $tags"
+            return
+        }
+
+        if( PUNCT_PATTERN.matcher(token).matches() ) {
+            tags = "punct"
+        }
+        else if( SYMBOL_PATTERN.matcher(token).matches() ) {
+            tags = "symb"
+        }
+        else {
+            if( lemma =~ /(?iu)^[а-яіїєґa-z0-9]/ ) {
+                wordCount++
+                if( lemma =~ /(?iu)^[а-яіїєґ]/ ) {
+                    ukWordCount++
+                }
+            }
+            
+            if( allTags == "null" ) {
+
+                if( UNKNOWN_PATTERN.matcher(token).matches() ) {
+                    tags = "unknown"
+                    nullTags << token
+                    nullTagCount++
+                }
+                else {
+                    tags = "unclass"
+                    nullTags << token
+                    nullTagCount++
+                }
+            }
+        }
+
+        
+        String commentAttr = ""
+        
+        def mComment = (trimmed =~ /\]\s+([^\h].+)$/)
+        if( mComment ) {
+            commentAttr = "comment=\"" + XmlUtil.escapeXml(mComment[0][1]) + "\" "
+        }
+
+
+        String tagsEnc = XmlUtil.escapeXml(tags)
+        // hopefully we don't need to encode apostrophe
+        String tokenEnc = token =~ /["<>&]/ ? XmlUtil.escapeXml(token) : token
+        String lemmaEnc = lemma =~ /["<>&]/ ? XmlUtil.escapeXml(lemma) : lemma
+
+        if( allTagsList.size() > 1 ) {
+            xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr>\n"
+            xmlFile << "    <alts>\n"
+            allTagsList[1..-1].each { tkn ->
+//                    println ":: '$tkn'"
+                (lemma, tags) = tkn.split("/")
+                tagsEnc = XmlUtil.escapeXml(tags)
+                // hopefully we don't need to encode apostrophe
+                lemmaEnc = lemma =~ /["<>]/ ? XmlUtil.escapeXml(lemma) : lemma
+                xmlFile << "      <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
+            }
+            xmlFile << "    </alts>\n"
+            xmlFile << "  </token>"
+        }
+        else {
+            xmlFile << "  <token value=\"$tokenEnc\" lemma=\"$lemmaEnc\" tags=\"$tagsEnc\" $commentAttr/>\n"
+        }
+            
+    } // each match
+
 }

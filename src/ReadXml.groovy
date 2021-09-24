@@ -32,12 +32,12 @@ class Stats {
     def lemmas = [:].withDefault{ 0 }
     def pos1Freq = [:].withDefault{ 0 }
 }
-@Field
-static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()«»„“"'…\u2013\u2014\u201D\u201C-]+/)
-@Field
-static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2070-\u209F\u20A0-\u20CF\u2100-\u214F\u2150-\u218F\u2200-\u22FF]+/)
-@Field
-static final Pattern UNKNOWN_PATTERN = Pattern.compile(/(.*-)?[а-яіїєґА-ЯІЇЄҐ]+(-.*)?/)
+//@Field
+//static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()«»„“"'…\u2013\u2014\u201D\u201C-]+/)
+//@Field
+//static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2000-\u20CF\u2100-\u218F\u2200-\u22FF]+/)
+//@Field
+//static final Pattern UNKNOWN_PATTERN = Pattern.compile(/(.*-)?[а-яіїєґА-ЯІЇЄҐ]+(-.*)?/)
 
 @Field
 Stats stats = new Stats()
@@ -234,7 +234,6 @@ void validateToken(xml) {
     if( lemma =~ /(?iu)^[а-яіїєґa-z0-9]/ ) {
         stats.wordCount++
         if( tags == "null" ) {
-
             if( LATIN_WORD_PATTERN.matcher(token).matches() ) {
                 tags = "unclass"
             }
@@ -250,8 +249,10 @@ void validateToken(xml) {
             String tagPair = "$lemma/$tags"
             if( tags.startsWith("noninfl:foreign") || tags.startsWith("unclass") ) {
             }
+            if( ltTags2[0].startsWith("null") && token.matches("[А-ЯІЇЄҐ][а-яіїєґА-ЯІЇЄҐ'-]+") && tags.matches(/noun:anim:.:v_...(:nv)?:prop:lname/) ) {
+            } 
             else {
-                boolean initials = token ==~ /[А-ЯІЇЄҐ]\./ && tagPair ==~ /[А-ЯІЇЄҐ]\.\/noun:anim:[mf]:v_...:nv:prop:.name:abbr/ 
+                boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv:abbr:prop:.name/ 
                 if( ! (tagPair in ltTags2) && ! initials ) {
                     stats.unverified << "$tagPair (token: $token) (avail: $ltTags2)"
                     //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
