@@ -23,14 +23,14 @@ class Stats {
     boolean sentence = false
     def unverified = []
     def nullTags = []
-    def titles = [:].withDefault { [] }
+    Map titles = [:].withDefault { [] }
     def parseFailues = []
-    def freqs = [:].withDefault{ 0 }
-    def freqs2 = [:].withDefault{ [:].withDefault { 0 } }
-    def words = [:].withDefault{ 0 }
-    def wordsNorm = [:].withDefault{ 0 }
-    def lemmas = [:].withDefault{ 0 }
-    def pos1Freq = [:].withDefault{ 0 }
+    Map freqs = [:].withDefault{ 0 }
+    Map<String, Map<String, Integer>> freqs2 = [:].withDefault{ [:].withDefault { 0 } }
+    Map words = [:].withDefault{ 0 }
+    Map wordsNorm = [:].withDefault{ 0 }
+    Map lemmas = [:].withDefault{ 0 }
+    Map pos1Freq = [:].withDefault{ 0 }
 }
 //@Field
 //static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()«»„“"'…\u2013\u2014\u201D\u201C-]+/)
@@ -161,14 +161,19 @@ private void processItem(File txtFile, GPathResult xml, int childIdx) {
     } 
 }
 
+@Field
+static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]:;…°]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
+
 //@CompileStatic
 private void printNode(File txtFile, GPathResult xml, int childIdx) {
     if( xml.text() || xml.parent().name()=="meta" ) {
         txtFile << "<${xml.name()}>${xml.text()}</${xml.name()}>\n"
     }
     else if( xml.name() == "token" ) {
+        boolean txt = false
+        if( txt ) {
         if( childIdx > 0 
-                && ! (xml.@value ==~ /[.!?,»\u201D)\]:;…°]|[.!?]{2,3}/)  // (\.,»…\)\]|[.!?]{3})/) 
+                && ! PUNCT_PATTERN.matcher(xml.@value.text()).matches()
                 && prevChild != null 
                 && ! (prevChild.@value ==~ /[«\u201C(\[]/) 
                 && needsSpace(prevChild) ) {
@@ -180,6 +185,7 @@ private void printNode(File txtFile, GPathResult xml, int childIdx) {
                 }
         } 
         txtFile << xml.@value
+        }
         
         validateToken(xml)
     }
@@ -212,12 +218,23 @@ static String keyPos(String tags) {
      tags.replaceFirst(/:.*/, '')
 }
 
+
+@Field
+static final Pattern VALID_TAG = Pattern.compile(/[a-z]+[a-z_0-9:&]*/)
+@Field
+static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
+@Field
+static final Pattern WORD_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґa-z0-9].*/)
+@Field
+static final Pattern MAIN_POS = Pattern.compile(/noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl/)
+
+
 void validateToken(xml) {
     String tags = xml.@tags
     String lemma = xml.@lemma
     String token = xml.@value
     
-    if( ! (tags ==~ /[a-z]+[a-z_0-9:&]*/) ) {
+    if( ! VALID_TAG.matcher(tags).matches() ) {
         System.err.println "Invalid tag: $tags"
         return
     }
@@ -225,13 +242,14 @@ void validateToken(xml) {
     stats.pos1Freq[keyPos(tags)]++
     
     
-    if( lemma =~ /(?iu)^[а-яіїєґ]/ ) {
+    if( UKR_LEMMA.matcher(lemma).matches() ) {
         stats.count++
         stats.words[token]++
         stats.wordsNorm[normalize(token, lemma)]++
         stats.lemmas[lemma]++
     }
-    if( lemma =~ /(?iu)^[а-яіїєґa-z0-9]/ ) {
+
+    if( WORD_LEMMA.matcher(lemma).matches() ) {
         stats.wordCount++
         if( tags == "null" ) {
             if( LATIN_WORD_PATTERN.matcher(token).matches() ) {
@@ -267,7 +285,7 @@ void validateToken(xml) {
     
     String tagPos = tags.replaceFirst(/:.*/, '')
     
-    if( tagPos ==~ /noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl/ ) {
+    if( MAIN_POS.matcher(tagPos).matches() ) {
         stats.freqs[lemma] += 1
         stats.freqs2[token][lemma+"/"+tagPos] += 1
     }
@@ -305,8 +323,9 @@ void writeStats() {
     coll.setStrength(java.text.Collator.IDENTICAL)
     coll.setDecomposition(java.text.Collator.NO_DECOMPOSITION)
     
-    freqs2
-        .findAll{ k,v -> v.size() > 1 }
+    Map<String, Map<String, Integer>> freqs2WithHoms = freqs2.findAll{ k,v -> v.size() > 1 } 
+    
+    freqs2WithHoms
         .toSorted { a, b -> coll.compare a.key, b.key }
         .each { k,v ->
             v.each { k2,v2 ->
@@ -324,6 +343,23 @@ void writeStats() {
                 outFileFreqFull << k.padRight(30) << " " << k2.padRight(30) << " " << v2 << "\n"
             }
         }
+    
+//    println ":: " + freqs2WithHoms.take(1)
+            
+    int uniqForms = freqs2.size()
+    int uniqFormsWithHom = freqs2WithHoms.size()
+    println "Total uniq forms: ${uniqForms}, with homonyms: ${uniqFormsWithHom}, ${(double)uniqFormsWithHom/uniqForms}"
+
+    int uniqFormsSum = freqs2.collect{ k,v -> v.values().sum(0) }.sum(0)
+    int uniqFormsWithHomSum = freqs2WithHoms.collect{ k,v -> v.values().sum(0) }.sum(0)
+    println "Total uniq forms sum: ${uniqFormsSum}, with homonyms: ${uniqFormsWithHomSum}, ${(double)uniqFormsWithHomSum/uniqFormsSum}"
+
+    Map freqs2Main = freqs2.findAll { k,v -> v.keySet().find{ ks -> (ks =~ /\/(noun|adj|adv|verb)/)} != null }
+    Map freqs2WithHomsMain = freqs2Main.findAll{ k,v -> v.size() > 1 } 
+    int uniqFormsSumMain = freqs2Main.collect{ k,v -> v.values().sum(0) }.sum(0)
+    int uniqFormsWithHomSumMain = freqs2WithHomsMain.collect{ k,v -> v.values().sum(0) }.sum(0)
+    println "Total uniq forms main: ${uniqFormsSumMain}, with homonyms: ${uniqFormsWithHomSumMain}, ${(double)uniqFormsWithHomSumMain/uniqFormsSumMain}"
+
     
     new File("err_unverified.txt").text = unverified.collect{ it.toString() }.toSorted(coll).join("\n")
     
