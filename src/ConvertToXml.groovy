@@ -1,6 +1,6 @@
 #!/bin/env groovy
 
-@Grab(group='org.languagetool', module='language-uk', version='5.5-SNAPSHOT')
+@Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
 
 import static groovy.io.FileType.FILES
 
@@ -39,7 +39,7 @@ def parseFailues = []
 @Field 
 static final Pattern PUNCT_PATTERN = Pattern.compile(/[,.:;!?\/()\[\]{}«»„“"'…\u2013\u2014\u201D\u201C•■♦-]+/)
 @Field 
-static final Pattern SYMBOL_PATTERN = Pattern.compile(/[\u00A0-\u00BF\u2000-\u20CF\u2100-\u218F\u2200-\u22FF]+/)
+static final Pattern SYMBOL_PATTERN = Pattern.compile(/[%&@$*+=<>\/\u00A0-\u00BF\u2000-\u20CF\u2100-\u218F\u2200-\u22FF]+/)
 @Field 
 static final Pattern UNKNOWN_PATTERN = Pattern.compile(/(.*-)?[а-яіїєґА-ЯІЇЄҐ]+(-.*)?/)
 @Field
@@ -97,7 +97,7 @@ files.each() { File file->
 //    System.exit 1
     
     
-    File xmlFile = new File(xmlFolder, file.name.replaceFirst(/_dis.txt$/, '.xml'))
+    File xmlFile = new File(xmlFolder, file.name.replaceFirst(/(_dis)?\.txt$/, '.xml'))
     xmlFile.text = '<?xml version="1.0" encoding="UTF-8"?>\n<text>\n<meta>\n'
 
     int lineCount = 0
