@@ -1,5 +1,7 @@
 #!/bin/env groovy
 
+package org.nlp_uk.bruk
+
 @Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
 
 import groovy.transform.Canonical
@@ -10,59 +12,12 @@ import groovy.xml.slurpersupport.NodeChild
 
 import java.util.regex.Pattern
 
+import org.apache.commons.csv.CSVFormat
+import org.apache.commons.csv.CSVPrinter
 import org.languagetool.AnalyzedToken
 import org.languagetool.AnalyzedTokenReadings
 import org.languagetool.tagging.uk.UkrainianTagger
 
-
-class ReadXml {
-
-static final Pattern POSTAG_KEY_PATTERN = Pattern.compile("^(noun:(anim|[iu]nanim)|verb(:rev)?:(perf|imperf)|adj|adv(p:(imperf:perf))?|part|prep|numr|conj:(coord|subord)|intj|onomat|punct|symb|noninfl|unclass|number|unknown|time|date|hashtag)")
-
-static String getPostagKey(String postag) {
-    def match = POSTAG_KEY_PATTERN.matcher(postag)
-    assert match, "postag: $postag"
-    match[0][0]
-}
-static String getPostagCore(String postag) {
-    // short/long
-    postag.replaceAll(/:rare|:arch|:coll|:slang|:bad|:subst/, '')
-}
-
-@CompileStatic
-@Canonical
-static class ContextToken {
-    String word
-    String lemma
-    String postagKey
-    String postag
-    
-    ContextToken(String word, String lemma, String postag) {
-        this.word = word
-        this.lemma = lemma
-        this.postagKey = getPostagKey(postag)
-        this.postag = getPostagCore(postag)
-    }
-    
-    String toString() {
-        "$word    $lemma    $postagKey    $postag"
-    }
-}
-
-@CompileStatic
-@Canonical
-class WordContext {
-    ContextToken contextToken
-    int offset
-    String postag // core
-    String lemma
-    
-    String toString() {
-        def offs = offset > 0 ? "+$offset" : "$offset"
-        "$offs $contextToken".padRight(50) + " $postag / $lemma"
-    }
-
-}
 
 
 @CompileStatic
@@ -77,28 +32,35 @@ class Stats {
     Map titles = [:].withDefault { [] }
     def parseFailues = []
     Map freqs = [:].withDefault{ 0 }
-    Map<String, Map<WordContext, Integer>> freqs2 = [:].withDefault { [:].withDefault { 0 } }
+    Map<String, Map<WordReading, Map<WordContext, Integer>>> disambigStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
+    Map<String, Map<WordReading, Integer>> disambigStatsF = [:].withDefault { [:].withDefault { 0 } }
     Map words = [:].withDefault{ 0 }
     Map wordsNorm = [:].withDefault{ 0 }
     Map lemmas = [:].withDefault{ 0 }
     Map pos1Freq = [:].withDefault{ 0 }
 }
 
-//@Field
+@Field
 Stats stats = new Stats()
-//@Field 
+@Field 
 @Lazy
 UkrainianTagger ukTagger = { new UkrainianTagger() }()
-//@Field
+@Field
 boolean toTagged = false
-//@Field
+@Field
 GPathResult prevChild = null
-//@Field
+@Field
 int sentIdx
-//@Field
+@Field
 Set<String> homonymTokens = new HashSet<>()
+@Field
+Set<String> allTags
 
-void main2(String[] args) {
+
+void main2() {
+    allTags = getClass().getResource('/ukrainian_tags.txt').readLines() as Set
+    allTags += [ 'punct', 'number', 'number:latin', 'time', 'date', 'unclass', 'unknown', 'symb', 'hashtag' ] 
+        
     File txt2Folder = new File("txt2")
     txt2Folder.mkdirs()
     
@@ -119,9 +81,10 @@ void main2(String[] args) {
         
     //    println "header: " + xml.meta.'*'.size()
     
-        xml.meta.'*'.eachWithIndex { GPathResult it, int idx ->
-            printNode(txtFile, it, idx)
-        }
+//        xml.meta.'*'.eachWithIndex { GPathResult it, int idx ->
+//            printNode(txtFile, it, idx)
+//        }
+                
         txtFile << "<body>\n"
         prevChild = xml['body'][0]
         sentIdx = 0
@@ -135,9 +98,7 @@ void main2(String[] args) {
     
 } 
 
-static void main(String[] args) {
-    new ReadXml().main2(args)
-}
+new ReadXml().main2()
 
 // end
 
@@ -156,7 +117,11 @@ private void generateStats(List<GPathResult> tokenXmls) {
         String lemma = it.@lemma.toString() 
         String postag = it.@tags.toString()
     
+        
         assert token, "Empty token at $idx, in $tokenXmls"
+
+        WordReading wordReading = new WordReading(lemma: lemma, postag: postag)
+        stats.disambigStatsF[token][wordReading] += 1
         
 //        println "tk: $token"
 //        println "pt: $postag"
@@ -174,14 +139,14 @@ private void generateStats(List<GPathResult> tokenXmls) {
                 def ctxXml = tokenXmls[idx-1]
 //                assert ctxXml.@token.text()
                 def ctxToken = new ContextToken(ctxXml.@value.text(), ctxXml.@lemma.text(), ctxXml.@tags.text())
-                def context = new WordContext(ctxToken, -1, postag, lemma)
-                stats.freqs2[token][context] += 1
+                def context = new WordContext(ctxToken, -1)
+                stats.disambigStats[token][wordReading][context] += 1
             }
             if( idx < tokenXmls.size()-1 ) { 
                 def ctxXml = tokenXmls[idx+1]
                 def ctxToken = new ContextToken(ctxXml.@value.text(), ctxXml.@lemma.text(), ctxXml.@tags.text())
-                def context = new WordContext(ctxToken, +1, postag, lemma)
-                stats.freqs2[token][context] += 1
+                def context = new WordContext(ctxToken, +1)
+                stats.disambigStats[token][wordReading][context] += 1
             }
         }
     }
@@ -246,7 +211,7 @@ private void processItem(File txtFile, GPathResult xml, int childIdx) {
     } 
 }
 
-//@Field
+@Field
 static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]:;…°]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
 
 //@CompileStatic
@@ -304,13 +269,13 @@ static String keyPos(String tags) {
 }
 
 
-//@Field
+@Field
 static final Pattern VALID_TAG = Pattern.compile(/[a-z]+[a-z_0-9:&]*/)
-//@Field
+@Field
 static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
-//@Field
+@Field
 static final Pattern WORD_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґa-z0-9].*/)
-//@Field
+@Field
 static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
 
 
@@ -318,11 +283,18 @@ void validateToken(xml) {
     String tags = xml.@tags
     String lemma = xml.@lemma
     String token = xml.@value
-    
-    if( ! VALID_TAG.matcher(tags).matches() ) {
-        System.err.println "Invalid tag: $tags"
-        return
+
+    if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
+        if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/ ) ) {
+            System.err.println "Invalid tag: $tags"
+            return
+        }
     }
+
+//    if( ! VALID_TAG.matcher(tags).matches() ) {
+//        System.err.println "Invalid tag: $tags"
+//        return
+//    }
 
     stats.pos1Freq[keyPos(tags)]++
     
@@ -362,8 +334,10 @@ void validateToken(xml) {
             else {
                 boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv:abbr:prop:.name/ 
                 if( ! (tagPair in ltTags2) && ! initials ) {
+                    if( ! (lemma in ['прескаленний', 'стріт', 'р-комплекс']) ) {
                     stats.unverified << "$tagPair (token: $token) (avail: $ltTags2)"
                     //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
+                    }
                     return
                 }
             }
@@ -371,7 +345,6 @@ void validateToken(xml) {
     }
 
 }
-
 
 void writeStats() {
     stats.with {
@@ -395,7 +368,9 @@ void writeStats() {
 
         // write warnings
         
-        new File("err_unverified.txt").text = unverified.collect{ it.toString() }.toSorted(coll).join("\n")
+        new File("err_unverified.txt").text = unverified.collect{ def s = it.toString() 
+            s =~ /^[^а-яіїєґ]/ ? "_$s".toString() : s.toString()
+        }.toSorted(coll).join("\n")
         
         def nullTagsFile = new File("err_null_tags.txt")
         nullTagsFile.text = nullTags.collect{ it.toString() }.toSorted(coll).join("\n")
@@ -417,25 +392,39 @@ void writeStats() {
             outFile << "$v\t$k\n"
         }
         
-        def outFileFreqFull = new File("lemma_freqs_full.txt")
-        outFileFreqFull.text = ""
-        def outFileFreqHom = new File("lemma_freqs_hom.txt")
-        outFileFreqHom.text = ""
+        writeDisambigStats(coll)
+    }
+}
+ 
+@CompileStatic
+void writeDisambigStats(java.text.Collator coll) {
+    def outFileFreqFull = new File("lemma_freqs_full.txt")
+    outFileFreqFull.text = ""
+    def outFileFreqHom = new File("lemma_freqs_hom.txt")
+    outFileFreqHom.text = ""
 
-        freqs2
-            .toSorted { a, b -> coll.compare a.key, b.key }
-            .each { String token, Map<WordContext, Integer> map ->
-                map.each { WordContext wordContext, value ->
-                    outFileFreqFull << token.padRight(25) << " " << wordContext.toString().padRight(30) << " " << value << "\n"
-                    if( token in homonymTokens ) {
-                        outFileFreqHom << token.padRight(25) << " " << wordContext.toString().padRight(30) << " " << value << "\n"
+    stats.with {
+        println "Writing ${disambigStats.size()} disambig stats..."
+        stats.disambigStats
+                .toSorted { a, b -> coll.compare a.key, b.key }
+                .each { String token, Map<WordReading, Map<WordContext, Integer>> map1 ->
+                    map1.each { WordReading wordReading, Map<WordContext, Integer> map2 ->
+//                        outFileFreqFull << token.padRight(20) << "," << wordReading << ", " << stats.disambigStatsF[token][wordReading] << "\n"
+                        if( token in homonymTokens ) {
+                            outFileFreqHom << token.padRight(20) << "," << wordReading << ", " << stats.disambigStatsF[token][wordReading] << "\n"
+                        }
+                        map2.each { WordContext wordContext, int value ->
+//                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
+                            if( token in homonymTokens ) {
+                                outFileFreqHom << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
+                            }
+                        }
                     }
                 }
-            }
-        
+
     //    println ":: " + freqs2WithHoms.take(1)
                 
-        int uniqForms = freqs2.size()
+//        int uniqForms = disambigStats.size()
     //    int uniqFormsWithHom = freqs2WithHoms.size()
     //    println "Total uniq forms: ${uniqForms}, with homonyms: ${uniqFormsWithHom}, ${(double)uniqFormsWithHom/uniqForms}"
     
@@ -448,6 +437,5 @@ void writeStats() {
 //        int uniqFormsSumMain = freqs2Main.collect{ k,v -> v.values().sum(0) }.sum(0)
 //        int uniqFormsWithHomSumMain = freqs2WithHomsMain.collect{ k,v -> v.values().sum(0) }.sum(0)
 //        println "Total uniq forms main: ${uniqFormsSumMain}, with homonyms: ${uniqFormsWithHomSumMain}, ${(double)uniqFormsWithHomSumMain/uniqFormsSumMain}"
-    }   
-}
+    }
 }
