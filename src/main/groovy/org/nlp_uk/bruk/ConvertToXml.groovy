@@ -1,5 +1,7 @@
 #!/bin/env groovy
 
+package org.nlp_uk.bruk
+
 @Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
 
 import static groovy.io.FileType.FILES

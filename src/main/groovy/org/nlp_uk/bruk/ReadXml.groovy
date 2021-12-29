@@ -61,12 +61,12 @@ void main2() {
     allTags = getClass().getResource('/ukrainian_tags.txt').readLines() as Set
     allTags += [ 'punct', 'number', 'number:latin', 'time', 'date', 'unclass', 'unknown', 'symb', 'hashtag' ] 
         
-    File txt2Folder = new File("txt2")
+    File txt2Folder = new File("good_gen")
     txt2Folder.mkdirs()
     
     def files = new File("xml").listFiles().sort{ it.name }
     files.each { File file->
-    
+            
         println "File: ${file.name}"
         
         File txtFile = new File(txt2Folder, file.name.replaceFirst(/.xml/, '.txt'))
@@ -85,13 +85,12 @@ void main2() {
 //            printNode(txtFile, it, idx)
 //        }
                 
-        txtFile << "<body>\n"
-        prevChild = xml['body'][0]
+        prevChild = xml.'*'[0]
         sentIdx = 0
-        xml['body'].'*'.eachWithIndex { it, idx ->
+        xml.'*'.eachWithIndex { it, idx ->
             processItem(txtFile, it, idx)
         }
-        txtFile << "\n</body>\n"
+        txtFile << "\n"
     }
     
     writeStats()
@@ -142,9 +141,20 @@ private void generateStats(List<GPathResult> tokenXmls) {
                 def context = new WordContext(ctxToken, -1)
                 stats.disambigStats[token][wordReading][context] += 1
             }
+            else {
+                def ctxToken = new ContextToken('', '', "BEG")
+                def context = new WordContext(ctxToken, -1)
+                stats.disambigStats[token][wordReading][context] += 1
+            }
+
             if( idx < tokenXmls.size()-1 ) { 
                 def ctxXml = tokenXmls[idx+1]
                 def ctxToken = new ContextToken(ctxXml.@value.text(), ctxXml.@lemma.text(), ctxXml.@tags.text())
+                def context = new WordContext(ctxToken, +1)
+                stats.disambigStats[token][wordReading][context] += 1
+            }
+            else {
+                def ctxToken = new ContextToken('', '', "END")
                 def context = new WordContext(ctxToken, +1)
                 stats.disambigStats[token][wordReading][context] += 1
             }
@@ -220,7 +230,7 @@ private void printNode(File txtFile, GPathResult xml, int childIdx) {
         txtFile << "<${xml.name()}>${xml.text()}</${xml.name()}>\n"
     }
     else if( xml.name() == "token" ) {
-        boolean txt = false
+        boolean txt = true
         if( txt ) {
         if( childIdx > 0 
                 && ! PUNCT_PATTERN.matcher(xml.@value.text()).matches()
@@ -244,7 +254,7 @@ private void printNode(File txtFile, GPathResult xml, int childIdx) {
         if( attrs ) attrs = " " + attrs
 
         if( xml.name() == "paragraph" ) {
-           txtFile << "\n" 
+           txtFile << "\n\n" 
            prevChild = null
            childIdx = 0
            sentIdx = 0
@@ -398,8 +408,8 @@ void writeStats() {
  
 @CompileStatic
 void writeDisambigStats(java.text.Collator coll) {
-    def outFileFreqFull = new File("lemma_freqs_full.txt")
-    outFileFreqFull.text = ""
+//    def outFileFreqFull = new File("lemma_freqs_full.txt")
+//    outFileFreqFull.text = ""
     def outFileFreqHom = new File("lemma_freqs_hom.txt")
     outFileFreqHom.text = ""
 
