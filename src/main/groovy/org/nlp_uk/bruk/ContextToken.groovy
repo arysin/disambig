@@ -7,35 +7,69 @@ import groovy.transform.Canonical
 import groovy.transform.CompileStatic
 
 @CompileStatic
+@Canonical
 class ContextToken {
     String word
     String lemma
-    String postagKey
+//    String postagKey
     String postag
     
+    @CompileStatic
     ContextToken(String word, String lemma, String postag) {
         this.word = word
         this.lemma = lemma
-        this.postagKey = getPostagKey(postag)
+//        this.postagKey = getPostagKey(postag)
         this.postag = getPostagCore(postag)
     }
     
+    @CompileStatic
+    static ContextToken normalized(String word, String lemma, String postag) {
+        new ContextToken(normalizeContextString(word),
+            normalizeContextString(lemma),
+            postag)
+    }
+        
+    @CompileStatic
     String toString() {
-        def w = word.indexOf(',') >= 0 ? word.replace(',', '^') : word
-        def l = lemma.indexOf(',') >= 0 ? lemma.replace(',', '^') : lemma
-        "$w, $l, $postag"
+        def w = safeguard(word)
+        def l = safeguard(lemma)
+        "$w\t$l\t$postag"
     }
     
-    static final Pattern POSTAG_KEY_PATTERN = Pattern.compile("^(noun:(anim|[iu]nanim)|verb(:rev)?:(perf|imperf)|adj|adv(p:(imperf:perf))?|part|prep|numr|conj:(coord|subord)|intj|onomat|punct|symb|noninfl|unclass|number|unknown|time|date|hashtag)")
-    
-    static String getPostagKey(String postag) {
-        Matcher match = POSTAG_KEY_PATTERN.matcher(postag)
-        assert match, "postag: $postag"
-        match.group(0)
-    }
+    static final Pattern POSTAG_KEY_PATTERN = Pattern.compile("^(noun:(anim|[iu]nanim)|verb(:rev)?:(perf|imperf)|adj|adv(p:(imperf:perf))?|part|prep|numr|conj:(coord|subord)|intj|onomat|punct|symb|noninfl|unclass|number|unknown|time|date|hashtag|BEG|END)")
+    static final Pattern POSTAG_CORE_KEY_PATTERN = Pattern.compile(/:(rare|arch|coll|slang|bad|subst)/)
+
+    @CompileStatic
     static String getPostagCore(String postag) {
         // short/long
-        postag.replaceAll(/:rare|:arch|:coll|:slang|:bad|:subst/, '')
+        POSTAG_CORE_KEY_PATTERN.matcher(postag).replaceAll('')
     }
-    
+
+    @CompileStatic
+    static String safeguard(String w) {
+        if( w == '' ) return '^'
+        w.indexOf(' ') >= 0 ? w.replace(' ', '\u2009') : w
+    }
+
+    @CompileStatic
+    static String unsafeguard(String w) {
+        if( w == '^' ) return ''
+        w = w.indexOf('\u2009') >= 0 ? w.replace('\u2009', ' ') : w
+    }
+
+    @CompileStatic
+    static String normalizeContextString(String w) {
+        if( w.length() == 3 )
+            return w.replaceFirst(/^\.\.\.$/, '…')
+
+        if( w.length() == 1 )            
+            return w.replaceAll(/^[\u2013\u2014]$/, '-')
+                .replace('„', '«')
+                .replace('“', '»')
+           
+        if( w.indexOf(".") > 0 )
+            return w.replaceAll(/^([?!.])\.+/, '$1')
+
+        return w
+    }
 }

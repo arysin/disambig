@@ -6,5 +6,9 @@
 .gradle
 txt*/
 xml*/
+good_gen/
+try/
 comments/
 /.settings/
+err*
+*freqs*

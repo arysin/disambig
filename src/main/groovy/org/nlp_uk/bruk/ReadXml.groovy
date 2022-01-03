@@ -3,12 +3,14 @@
 package org.nlp_uk.bruk
 
 @Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
+@Grab(group='org.apache.commons', module='commons-csv', version='1.9.0')
 
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 import groovy.xml.slurpersupport.GPathResult
-import groovy.xml.slurpersupport.NodeChild
+import groovy.xml.slurpersupport.Node
+import groovy.xml.slurpersupport.Attribute
 
 import java.util.regex.Pattern
 
@@ -31,7 +33,7 @@ class Stats {
     def nullTags = []
     Map titles = [:].withDefault { [] }
     def parseFailues = []
-    Map freqs = [:].withDefault{ 0 }
+    Map<String, Integer> freqs = [:].withDefault{ 0 }
     Map<String, Map<WordReading, Map<WordContext, Integer>>> disambigStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
     Map<String, Map<WordReading, Integer>> disambigStatsF = [:].withDefault { [:].withDefault { 0 } }
     Map words = [:].withDefault{ 0 }
@@ -48,13 +50,15 @@ UkrainianTagger ukTagger = { new UkrainianTagger() }()
 @Field
 boolean toTagged = false
 @Field
-GPathResult prevChild = null
+Node prevChild = null
 @Field
 int sentIdx
 @Field
 Set<String> homonymTokens = new HashSet<>()
 @Field
 Set<String> allTags
+@Field
+boolean produceTxt = true
 
 
 void main2() {
@@ -74,7 +78,7 @@ void main2() {
     
         String inText = file.text
     
-        String origName = txtFile.getName().replaceFirst(/_dis\.txt/, '.txt')
+        String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
         assert new File("good/$origName").isFile()
     
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(inText)
@@ -85,9 +89,12 @@ void main2() {
 //            printNode(txtFile, it, idx)
 //        }
                 
-        prevChild = xml.'*'[0]
+        Iterator<Node> childNodes = xml.childNodes()
+//        println ":: " + childNodes.next().class
+//        prevChild = childNodes[0]
         sentIdx = 0
-        xml.'*'.eachWithIndex { it, idx ->
+        childNodes.eachWithIndex { Node it, int idx ->
+            if( idx == 0 ) prevChild = it
             processItem(txtFile, it, idx)
         }
         txtFile << "\n"
@@ -104,22 +111,24 @@ new ReadXml().main2()
 
 
 @CompileStatic
-static boolean needsSpace(NodeChild prevChild) {
+static boolean needsSpace(Node prevChild) {
     return prevChild != null && \
-        (prevChild.name() != "format" || ((String)prevChild.attributes()['tag']).startsWith("/"))
+        (prevChild.name() != "format" || ((String)prevChild.attributes()['tag']).startsWith("/")) \
+            && ! (((String)prevChild.attributes()['value']) =~ /[°\/]/)
 }
 
-private void generateStats(List<GPathResult> tokenXmls) {
+@CompileStatic
+private void generateStats(List<Node> tokenXmls) {
     
     tokenXmls.eachWithIndex { it, idx ->
-        String token = it.@value.toString() 
-        String lemma = it.@lemma.toString() 
-        String postag = it.@tags.toString()
+        String token = it.attributes()['value'].toString() 
+        String lemma = it.attributes()['lemma'].toString() 
+        String postag = it.attributes()['tags'].toString()
     
         
         assert token, "Empty token at $idx, in $tokenXmls"
 
-        WordReading wordReading = new WordReading(lemma: lemma, postag: postag)
+        WordReading wordReading = new WordReading(lemma, postag)
         stats.disambigStatsF[token][wordReading] += 1
         
 //        println "tk: $token"
@@ -133,28 +142,30 @@ private void generateStats(List<GPathResult> tokenXmls) {
         if( postag != null && MAIN_POS.matcher(postag).find() ) {
             stats.freqs[lemma] += 1
             
-            def currCtxToken = new ContextToken(token, lemma, postag)
+            def currCtxToken = ContextToken.normalized(token, lemma, postag)
             if( idx > 0 ) { 
                 def ctxXml = tokenXmls[idx-1]
 //                assert ctxXml.@token.text()
-                def ctxToken = new ContextToken(ctxXml.@value.text(), ctxXml.@lemma.text(), ctxXml.@tags.text())
+                Map<String, String> ctxAttrs = ctxXml.attributes()
+                ContextToken ctxToken = ContextToken.normalized(ctxAttrs['value'], ctxAttrs['lemma'], ctxAttrs['tags'])
                 def context = new WordContext(ctxToken, -1)
                 stats.disambigStats[token][wordReading][context] += 1
             }
             else {
-                def ctxToken = new ContextToken('', '', "BEG")
+                def ctxToken = new ContextToken('^', '^', "BEG")
                 def context = new WordContext(ctxToken, -1)
                 stats.disambigStats[token][wordReading][context] += 1
             }
 
             if( idx < tokenXmls.size()-1 ) { 
                 def ctxXml = tokenXmls[idx+1]
-                def ctxToken = new ContextToken(ctxXml.@value.text(), ctxXml.@lemma.text(), ctxXml.@tags.text())
+                Map<String, String> ctxAttrs = ctxXml.attributes()
+                ContextToken ctxToken = ContextToken.normalized(ctxAttrs['value'], ctxAttrs['lemma'], ctxAttrs['tags'])
                 def context = new WordContext(ctxToken, +1)
                 stats.disambigStats[token][wordReading][context] += 1
             }
             else {
-                def ctxToken = new ContextToken('', '', "END")
+                def ctxToken = new ContextToken('^', '^', "END")
                 def context = new WordContext(ctxToken, +1)
                 stats.disambigStats[token][wordReading][context] += 1
             }
@@ -163,7 +174,10 @@ private void generateStats(List<GPathResult> tokenXmls) {
 //    println "generateStats stats: ${stats.freqs2.size()}"
 }
 
-private void processItem(File txtFile, GPathResult xml, int childIdx) {
+@CompileStatic
+private void processItem(File txtFile, Node xml, int childIdx) {
+    Iterator<Node> childNodes = xml.childNodes()
+    
     if( xml.name() == "sentence" ) {
         if( sentIdx > 0 && needsSpace(prevChild) ) {
             txtFile << " "
@@ -171,23 +185,33 @@ private void processItem(File txtFile, GPathResult xml, int childIdx) {
         childIdx = 0
         sentIdx++
 
-        List tokenXmls = []
+        List<Node> tokenXmls = new ArrayList<>()
         
-        xml.'*'.eachWithIndex { it, idx2 ->
+        childNodes.eachWithIndex { Node it, int idx2 ->
             processItem(txtFile, it, idx2)
             if( it.name() == "token" ) {
                 tokenXmls << it
             }
         }
         
-        generateStats(tokenXmls)
+        if( ! (txtFile.name in [
+                'A_Kozatska_varta_Krasovskyi_Promyslovist_Zaporozkoyi_Sichi_2013.txt',
+                'G_Babak_Infomatsiine_zabezpechennia_monitoryngu_2015.txt',
+                'I_Yarova_Chorno_bile_2016.txt'
+                ]) ) {
+            generateStats(tokenXmls)
+        }
+        else {
+            println "\tignoring stats for ${txtFile.name}"
+        }
     }
-    else if( xml.childNodes() && ! xml.childNodes()[0].name() == "alts" ) {
+    else if( childNodes
+            && ! ((Node)childNodes[0]).name() == "alts" ) {
         String xmlName = xml.name()
         
         txtFile << "<$xmlName>"
 
-        xml.'*'.eachWithIndex { it, idx2 -> 
+        childNodes.eachWithIndex { Node it, int idx2 -> 
             processItem(txtFile, it, idx2)
         }
 
@@ -197,8 +221,8 @@ private void processItem(File txtFile, GPathResult xml, int childIdx) {
         String xmlName = xml.name()
 
         if( xmlName.contains("format") ) {
-            xmlName = xml.@tag
-            if( ((NodeChild)xml).attributes()['tag'] == 'br' ) {
+            xmlName = xml.attributes()['tag']
+            if( ((Node)xml).attributes()['tag'] == 'br' ) {
                 txtFile << "\n"
                 prevChild = null
                 childIdx = 0
@@ -208,7 +232,7 @@ private void processItem(File txtFile, GPathResult xml, int childIdx) {
             if( childIdx > 0 
                     && prevChild != null 
                     && prevChild.name() != 'format'
-                    && ! (prevChild.@value ==~ /[«\u201C(\[]/) 
+                    && ! (prevChild.attributes()['value'] ==~ /[«\u201C(\[]/) 
                     && ! ((String)xml.attributes()['tag']).startsWith("/") ) {
                 txtFile << " "
             }
@@ -222,53 +246,54 @@ private void processItem(File txtFile, GPathResult xml, int childIdx) {
 }
 
 @Field
-static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]:;…°]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
+static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]:;…]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
 
-//@CompileStatic
-private void printNode(File txtFile, GPathResult xml, int childIdx) {
-    if( xml.text() || xml.parent().name()=="meta" ) {
-        txtFile << "<${xml.name()}>${xml.text()}</${xml.name()}>\n"
+@CompileStatic
+private void printNode(File txtFile, Node node, int childIdx) {
+    if( node.text() || node.parent().name()=="meta" ) {
+        txtFile << "<${node.name()}>${node.text()}</${node.name()}>\n"
     }
-    else if( xml.name() == "token" ) {
-        boolean txt = true
-        if( txt ) {
-        if( childIdx > 0 
-                && ! PUNCT_PATTERN.matcher(xml.@value.text()).matches()
-                && prevChild != null 
-                && ! (prevChild.@value ==~ /[«\u201C(\[]/) 
-                && needsSpace(prevChild) ) {
-                if( childIdx == 1 && prevChild.@value ==~ '…|[.]{3}' ) {
+    else if( node.name() == "token" ) {
+        if( produceTxt ) {
+            if( childIdx > 0 
+                    && ! PUNCT_PATTERN.matcher(node.attributes()['value'].toString()).matches()
+                    && prevChild != null 
+                    && ! (prevChild.attributes()['value'] ==~ /[«\u201C\/(\[]/) 
+                    && needsSpace(prevChild) ) {
+                if( childIdx == 1 && prevChild.attributes()['value'] ==~ /…|\.{3}/ ) {
                     
                 }
                 else {
                     txtFile << " "
                 }
-        } 
-        txtFile << xml.@value
+            } 
+            txtFile << node.attributes()['value']
         }
         
-        validateToken(xml)
+        validateToken(node)
     }
     else {
-        String attrs = ((NodeChild)xml).attributes().collect { k,v -> "$k=\"$v\"" }.join(" ")
+        String attrs = ((Node)node).attributes().collect { k,v -> "$k=\"$v\"" }.join(" ")
         if( attrs ) attrs = " " + attrs
 
-        if( xml.name() == "paragraph" ) {
+        if( node.name() == "paragraph" ) {
            txtFile << "\n\n" 
            prevChild = null
            childIdx = 0
            sentIdx = 0
         }
         else {
-            txtFile << "<${xml.name()}$attrs/>"
+            txtFile << "<${node.name()}$attrs/>"
         }
     }
-    prevChild = xml
+    prevChild = node
 }
 
 @CompileStatic
 static String normalize(String token, String lemma) {
-    if( ! lemma || lemma =~ /^[А-ЯІЇЄҐ]([а-яіїєґ'-]|$)/ )
+    if( ! lemma 
+        || (lemma.length() == 1 && lemma ==~ /[А-ЯІЇЄҐ]/ )
+        || lemma =~ /^[А-ЯІЇЄҐ]['-]?[а-яіїєґ]/ )
         return token
     return token.toLowerCase()
 }
@@ -289,11 +314,16 @@ static final Pattern WORD_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґa-z0-9].*
 static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
 
 
-void validateToken(xml) {
-    String tags = xml.@tags
-    String lemma = xml.@lemma
-    String token = xml.@value
+//@CompileStatic
+void validateToken(Node xml) {
+    def attributes = xml.attributes()
+    String tags = attributes['tags']
+    String lemma = attributes['lemma']
+    String token = attributes['value']
 
+    if( tags in ['xmltag'] )
+        return
+    
     if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
         if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/ ) ) {
             System.err.println "Invalid tag: $tags"
@@ -416,17 +446,22 @@ void writeDisambigStats(java.text.Collator coll) {
     stats.with {
         println "Writing ${disambigStats.size()} disambig stats..."
         stats.disambigStats
-                .toSorted { a, b -> coll.compare a.key, b.key }
+                .toSorted { a, b -> coll.compare a.getKey(), b.getKey() }
                 .each { String token, Map<WordReading, Map<WordContext, Integer>> map1 ->
-                    map1.each { WordReading wordReading, Map<WordContext, Integer> map2 ->
+                    map1
+                    .toSorted{ a, b -> b.getKey().getPostag().compareTo(a.getKey().getPostag()) }
+                    .each { WordReading wordReading, Map<WordContext, Integer> map2 ->
 //                        outFileFreqFull << token.padRight(20) << "," << wordReading << ", " << stats.disambigStatsF[token][wordReading] << "\n"
                         if( token in homonymTokens ) {
-                            outFileFreqHom << token.padRight(20) << "," << wordReading << ", " << stats.disambigStatsF[token][wordReading] << "\n"
+                            outFileFreqHom << token << "\t\t" << wordReading << "\t" << stats.disambigStatsF[token][wordReading] << "\n"
                         }
-                        map2.each { WordContext wordContext, int value ->
+                        map2
+//                        .toSorted{ a, b -> b.key.contextToken.word.compareTo(a.key.contextToken.word) }
+                        .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
+                        .each { WordContext wordContext, int value ->
 //                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
-                            if( token in homonymTokens ) {
-                                outFileFreqHom << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
+                            if( wordContext.getOffset() == -1 && token in homonymTokens ) {
+                                outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << value << "\n"
                             }
                         }
                     }

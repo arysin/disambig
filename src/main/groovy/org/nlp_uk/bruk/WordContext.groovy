@@ -9,8 +9,15 @@ class WordContext {
     ContextToken contextToken
     int offset
     
+    @CompileStatic
+    WordContext(ContextToken contexToken, int offset) {
+        this.contextToken = contexToken
+        this.offset = offset
+    }
+    
+    @CompileStatic
     String toString() {
         def offs = offset > 0 ? "+$offset" : "$offset"
-        "$offs, $contextToken"
+        "$offs\t$contextToken"
     }
 }

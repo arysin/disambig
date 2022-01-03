@@ -8,7 +8,6 @@ compileJava.options.encoding = 'UTF-8'
 
 
 group = 'ua.net.nlp'
-version="2.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -23,7 +22,8 @@ dependencies {
 //    implementation group: 'org.codehaus.groovy', name: 'groovy-cli-picocli', version: '3.0.8'
 //    implementation group: 'info.picocli', name: 'picocli', version: '4.6.1'
 
-//    implementation group:'ch.qos.logback', name:'logback-classic', version:'1.2.3'
+    implementation group:'ch.qos.logback', name:'logback-classic', version:'1.2.3'
+    implementation group: 'org.apache.commons', name: 'commons-csv', version: '1.9.0'
 
     implementation("org.languagetool:language-uk:$ltUkVersion") {
         exclude module: 'hunspell'
@@ -47,7 +47,7 @@ sourceSets {
     main {
         resources {
 //            srcDir "src/main/groovy"
-            srcDir "src"
+            //srcDir "src"
 //            include "**/*.groovy"
 //            includes = ["**/tools/*.md", "*.groovy", "**/*.txt"]
         }

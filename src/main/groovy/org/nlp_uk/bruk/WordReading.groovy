@@ -9,7 +9,14 @@ class WordReading {
     String lemma
     String postag
     
+    @CompileStatic
+    WordReading(String lemma, String postag) {
+        this.lemma = lemma
+        this.postag = postag
+    }
+    
+    @CompileStatic
     String toString() {
-        "$lemma, $postag"
+        "$lemma\t$postag"
     }
 }
