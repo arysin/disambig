@@ -2,7 +2,7 @@
 
 package org.nlp_uk.bruk
 
-@Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
+@Grab(group='org.languagetool', module='language-uk', version='5.7-SNAPSHOT')
 @Grab(group='org.apache.commons', module='commons-csv', version='1.9.0')
 
 import groovy.transform.Canonical
@@ -27,12 +27,8 @@ class Stats {
     int count = 0
     int wordCount = 0
     int multiTagCount = 0
-    int nullTagCount = 0
     boolean sentence = false
     def unverified = []
-    def nullTags = []
-    Map titles = [:].withDefault { [] }
-    def parseFailues = []
     Map<String, Integer> freqs = [:].withDefault{ 0 }
     Map<String, Map<WordReading, Map<WordContext, Integer>>> disambigStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
     Map<String, Map<WordReading, Integer>> disambigStatsF = [:].withDefault { [:].withDefault { 0 } }
@@ -58,18 +54,29 @@ Set<String> homonymTokens = new HashSet<>()
 @Field
 Set<String> allTags
 @Field
+Set<String> ignoreForStats
+@Field
+Set<String> ignored = new HashSet<>()
+@Field
 boolean produceTxt = true
 
 
 void main2() {
     allTags = getClass().getResource('/ukrainian_tags.txt').readLines() as Set
     allTags += [ 'punct', 'number', 'number:latin', 'time', 'date', 'unclass', 'unknown', 'symb', 'hashtag' ] 
-        
+
+    ignoreForStats = getClass().getResource('/ignore_for_stats.txt').readLines().findAll { it && ! it.startsWith('#') } as Set
+    println "Ignoring for stats: ${ignoreForStats.size()} files"
+    
     File txt2Folder = new File("good_gen")
     txt2Folder.mkdirs()
     
     def files = new File("xml").listFiles().sort{ it.name }
     files.each { File file->
+        if( ! file.name.endsWith('.xml') ) {
+            System.err.println "Unknown file: ${file.name}"
+            return
+        }
             
         println "File: ${file.name}"
         
@@ -194,15 +201,11 @@ private void processItem(File txtFile, Node xml, int childIdx) {
             }
         }
         
-        if( ! (txtFile.name in [
-                'A_Kozatska_varta_Krasovskyi_Promyslovist_Zaporozkoyi_Sichi_2013.txt',
-                'G_Babak_Infomatsiine_zabezpechennia_monitoryngu_2015.txt',
-                'I_Yarova_Chorno_bile_2016.txt'
-                ]) ) {
+        if( ! (txtFile.name in ignoreForStats) ) {
             generateStats(tokenXmls)
         }
         else {
-            println "\tignoring stats for ${txtFile.name}"
+            ignored << txtFile.name
         }
     }
     else if( childNodes
@@ -325,7 +328,7 @@ void validateToken(Node xml) {
         return
     
     if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
-        if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/ ) ) {
+        if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv(:abbr:prop:[fp]name|:prop:[fp]name:abbr)/ ) ) {
             System.err.println "Invalid tag: $tags"
             return
         }
@@ -353,8 +356,7 @@ void validateToken(Node xml) {
                 tags = "unclass"
             }
             else {
-                stats.nullTags << token
-                stats.nullTagCount++
+                System.err.println "null tag for $token"
             }
         }
         else if( ! tags.startsWith("noninfl") && ! tags.startsWith("unclass") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
@@ -372,11 +374,12 @@ void validateToken(Node xml) {
             if( ltTags2[0].startsWith("null") && token.matches("[А-ЯІЇЄҐ][а-яіїєґА-ЯІЇЄҐ'-]+") && tags.matches(/noun:anim:.:v_...(:nv)?:prop:lname/) ) {
             } 
             else {
-                boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv:abbr:prop:.name/ 
+                boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv(:abbr:prop:[fp]name|:prop:[fp]name:abbr)/ 
                 if( ! (tagPair in ltTags2) && ! initials ) {
-                    if( ! (lemma in ['прескаленний', 'стріт', 'р-комплекс']) ) {
-                    stats.unverified << "$tagPair (token: $token) (avail: $ltTags2)"
-                    //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
+                    if( token != "їх" || ! (tags ==~ /adj:[mfnp]:v_...(:r(in)?anim)?:nv:&pron:pos:bad/ ) ) {
+                        
+                        stats.unverified << "$tagPair (token: $token) (avail: $ltTags2)"
+                //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
                     }
                     return
                 }
@@ -398,7 +401,6 @@ void writeStats() {
         
     //    println "$multiWordCount multiword tags !!"
         println "$multiTagCount tokens with multiple tags !!"
-        println "$nullTagCount tokens with null tags !!"
         println "${unverified.size()} tokens with unverified tags !!"
 
         
@@ -409,18 +411,12 @@ void writeStats() {
         // write warnings
         
         new File("err_unverified.txt").text = unverified.collect{ def s = it.toString() 
-            s =~ /^[^а-яіїєґ]/ ? "_$s".toString() : s.toString()
-        }.toSorted(coll).join("\n")
+            s =~ /^[^а-яіїєґ]/ ? "* $s".toString() : s.toString()
+        }
+            .toSorted(coll)
+            .collect{ it.replaceFirst(/^\* /, '') }
+            .join("\n")
         
-        def nullTagsFile = new File("err_null_tags.txt")
-        nullTagsFile.text = nullTags.collect{ it.toString() }.toSorted(coll).join("\n")
-        
-        def parseFailuresFile = new File("err_parse_failures.txt")
-        parseFailuresFile.text = parseFailues.collect{ it.toString() }.toSorted(coll).join("\n")
-        
-        def dupsFile = new File("err_dups.txt")
-        dupsFile.text = titles.findAll { k,v -> v.size() > 1 }.collect{ k,v -> "$k\n\t"+ v.join("\n\t") }.join("\n")
-    
         // write stats
             
         freqs = freqs.toSorted { - it.value }
@@ -443,6 +439,8 @@ void writeDisambigStats(java.text.Collator coll) {
     def outFileFreqHom = new File("lemma_freqs_hom.txt")
     outFileFreqHom.text = ""
 
+    println "Ignored for stats: $ignored"
+    
     stats.with {
         println "Writing ${disambigStats.size()} disambig stats..."
         stats.disambigStats

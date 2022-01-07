@@ -75,8 +75,7 @@ test {
 
 task run(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
-//    main = "ua.net.nlp_uk.ubertext.MongoDriver"
-    main = "ConvertToXml"
+    main = "org.nlp_uk.bruk.ReadXml"
 
     jvmArgs '-Dgroovy.grape.enable=false'
 
