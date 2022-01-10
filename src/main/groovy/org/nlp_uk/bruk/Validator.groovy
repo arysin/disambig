@@ -95,7 +95,6 @@ class Validator {
     
     @CompileStatic
     void validateSentence(List<Node> xmls, File txtFile) {
-    
         int pos = 0
         def readings = xmls.collect { Node xml ->
             def attributes = xml.attributes()
@@ -107,6 +106,7 @@ class Validator {
             pos += token.length() + 1
             atr
         }
+        readings.add(0, new AnalyzedTokenReadings(Arrays.asList(new AnalyzedToken('', JLanguageTool.SENTENCE_START_TAGNAME, '')), 0))
         AnalyzedSentence sent = new AnalyzedSentence(readings.toArray(new AnalyzedTokenReadings[0]))
         
         validationRules.each { rule ->
