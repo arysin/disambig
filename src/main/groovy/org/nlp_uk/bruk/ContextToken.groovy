@@ -27,14 +27,14 @@ class ContextToken {
     
     @CompileStatic
     static ContextToken normalized(String word, String lemma, String postag) {
-        boolean hasCapLemma = lemma && lemma =~ /^[^а-яіїєґ]/ 
-        word = hasCapLemma ? word : word.toLowerCase()
+//        boolean hasLowerCaseLemma = lemma && lemma =~ /^[а-яіїєґ]/ 
+//        word = hasLowerCaseLemma ? word.toLowerCase() : word
 
         new ContextToken(normalizeContextString(word, postag),
             normalizeContextString(lemma, postag),
             postag)
     }
-        
+
     @CompileStatic
     String toString() {
         def w = safeguard(word)

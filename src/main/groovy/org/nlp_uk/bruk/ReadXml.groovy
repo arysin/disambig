@@ -41,7 +41,7 @@ boolean produceTxt = true
 
 //void main2() {
     
-    File txt2Folder = new File("good_gen")
+    File txt2Folder = new File("txt/gen")
     txt2Folder.mkdirs()
     
     def files = new File("xml").listFiles().sort{ it.name }
@@ -59,7 +59,7 @@ boolean produceTxt = true
         String inText = file.text
     
         String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
-        assert new File("good/$origName").isFile()
+        assert new File("txt/orig/$origName").isFile()
     
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(inText)
         
@@ -88,7 +88,7 @@ boolean produceTxt = true
 static boolean needsSpace(Node prevChild) {
     return prevChild != null && \
         (prevChild.name() != "format" || ((String)prevChild.attributes()['tag']).startsWith("/")) \
-            && ! (((String)prevChild.attributes()['value']) =~ /[°\/]/)
+            && ! (((String)prevChild.attributes()['value']) ==~ /[°\/]/)
 }
 
 
@@ -157,7 +157,7 @@ private void processItem(File txtFile, Node xml, int childIdx) {
 }
 
 @Field
-static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]:;…]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
+static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]%\/:;…]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
 
 @CompileStatic
 private void printNode(File txtFile, Node node, int childIdx) {

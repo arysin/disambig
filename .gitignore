@@ -4,9 +4,8 @@
 .project
 *.bak
 .gradle
-txt*/
-xml*/
-good_gen/
+xml/
+txt/
 try/
 comments/
 /.settings/
