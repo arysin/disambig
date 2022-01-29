@@ -22,16 +22,14 @@ class ContextToken {
     ContextToken(String word, String lemma, String postag) {
         this.word = word
         this.lemma = lemma
+//        assert postag, "Empty postag for $word/$lemma"
         this.postag = getPostagCore(postag)
     }
     
     @CompileStatic
     static ContextToken normalized(String word, String lemma, String postag) {
-//        boolean hasLowerCaseLemma = lemma && lemma =~ /^[а-яіїєґ]/ 
-//        word = hasLowerCaseLemma ? word.toLowerCase() : word
-
-        new ContextToken(normalizeContextString(word, postag),
-            normalizeContextString(lemma, postag),
+        new ContextToken(normalizeContextString(word, lemma, postag),
+            normalizeContextString(lemma, '', postag),
             postag)
     }
 
@@ -44,7 +42,7 @@ class ContextToken {
     
     @CompileStatic
     static String getPostagCore(String postag) {
-        POSTAG_CORE_REMOVE_PATTERN.matcher(postag).replaceAll('')
+        postag != null ? POSTAG_CORE_REMOVE_PATTERN.matcher(postag).replaceAll('') : postag
     }
 
     @CompileStatic
@@ -60,7 +58,7 @@ class ContextToken {
     }
 
     @CompileStatic
-    static String normalizeContextString(String w, String postag) {
+    static String normalizeContextString(String w, String lemma, String postag) {
         if( postag == "number" ) {
             def m0 = Pattern.compile(/[12][0-9]{3}/).matcher(w) // preserve a year - often works as adj
             if( m0.matches() )
@@ -88,9 +86,20 @@ class ContextToken {
                 return w.replaceAll(/^([?!.])\.+/, '$1')
         }
 
-//        if( ! postag.contains("prop") && ! postag.contains("abbr") )
-//            return w.toLowerCase()
+        boolean hasLowerCaseLemma = lemma && lemma =~ /^[а-яіїєґ]/
+        w = hasLowerCaseLemma ? w.toLowerCase() : w
         
+//        if( postag == "prep" ) {
+//            if( w=="із" || w=="зо" )
+//                return "з"
+//            if( w=="у" )
+//                return "в"
+//        }
+//        else if( postag == "conj:coord" ) {
+//            if( w=="й" )
+//                return "і"
+//        }
+            
         return w
     }
 }

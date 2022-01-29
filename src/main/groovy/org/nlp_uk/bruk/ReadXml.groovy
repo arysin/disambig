@@ -34,6 +34,8 @@ boolean toTagged = false
 @Field
 Node prevChild = null
 @Field
+boolean quoteOpen
+@Field
 int sentIdx
 @Field
 boolean produceTxt = true
@@ -166,19 +168,26 @@ private void printNode(File txtFile, Node node, int childIdx) {
     }
     else if( node.name() == "token" ) {
         if( produceTxt ) {
+            String nodeValue = node.attributes()['value'].toString()
+            if( nodeValue == '"' ) quoteOpen = ! quoteOpen
             if( childIdx > 0 
-                    && ! PUNCT_PATTERN.matcher(node.attributes()['value'].toString()).matches()
+                    && ! PUNCT_PATTERN.matcher(nodeValue).matches()
                     && prevChild != null 
-                    && ! (prevChild.attributes()['value'] ==~ /[«\u201C\/(\[]/) 
+                    && ! (prevChild.attributes()['value'] ==~ /[«\u201C\/(\[$]/) 
                     && needsSpace(prevChild) ) {
                 if( childIdx == 1 && prevChild.attributes()['value'] ==~ /…|\.{3}/ ) {
                     
                 }
                 else {
+                    if( prevChild.attributes()['value'] == '"' && quoteOpen ) {
+                    }
+                    else if( nodeValue == '"' && ! quoteOpen ) {
+                    }
+                    else 
                     txtFile << " "
                 }
             } 
-            txtFile << node.attributes()['value']
+            txtFile << nodeValue
         }
         
         validateToken(node, txtFile)
@@ -190,6 +199,7 @@ private void printNode(File txtFile, Node node, int childIdx) {
         if( node.name() == "paragraph" ) {
            txtFile << "\n\n" 
            prevChild = null
+           quoteOpen = false
            childIdx = 0
            sentIdx = 0
         }

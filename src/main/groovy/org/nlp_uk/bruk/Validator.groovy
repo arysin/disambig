@@ -6,6 +6,7 @@ import org.languagetool.AnalyzedSentence
 import org.languagetool.AnalyzedToken
 import org.languagetool.AnalyzedTokenReadings
 import org.languagetool.JLanguageTool
+import org.languagetool.language.Ukrainian
 import org.languagetool.rules.RuleMatch
 import org.languagetool.rules.uk.TokenAgreementAdjNounRule
 import org.languagetool.rules.uk.TokenAgreementNounVerbRule
@@ -21,7 +22,8 @@ class Validator {
     UkrainianTagger ukTagger = { new UkrainianTagger() }()
     Set<String> allTags
     ResourceBundle messages = JLanguageTool.getDataBroker().getResourceBundle(JLanguageTool.MESSAGE_BUNDLE, new Locale("uk"))
-    List<org.languagetool.rules.Rule> validationRules = [new TokenAgreementNounVerbRule(messages),
+    List<org.languagetool.rules.Rule> validationRules = 
+        [new TokenAgreementNounVerbRule(messages),
         new TokenAgreementAdjNounRule(messages),
         new TokenAgreementPrepNounRule(messages)]
     Stats stats
@@ -36,12 +38,16 @@ class Validator {
         allTags = getClass().getResource('/ukrainian_tags.txt').readLines() as Set
         allTags += [ 'punct', 'number', 'number:latin', 'time', 'date', 'unclass', 'unknown', 'symb', 'hashtag' ]
     
+//        validationRules += new Ukrainian().getPatternRules()
     }
     
     @CompileStatic
     boolean validateToken(String token, String lemma, String tags, File txtFile) {
+        assert tags, "no tags for token $token"
+        assert lemma != null, "no lemma for token $token"
+        
         if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
-            if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv(:abbr:prop:[fp]name|:prop:[fp]name:abbr)/ ) ) {
+            if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/ ) ) {
                 println "\tInvalid tag: $tags for $token"
                 errValidations[txtFile.name.replace('.txt', '.xml')] << "Invalid tag: $tags for $token".toString()
                 return false
@@ -75,10 +81,10 @@ class Validator {
                 String tagPair = "$lemma/$tags"
                 if( tags.startsWith("noninfl:foreign") || tags.startsWith("unclass") ) {
                 }
-                if( ltTags2[0].startsWith("null") && token.matches("[А-ЯІЇЄҐ][а-яіїєґА-ЯІЇЄҐ'-]+") && tags.matches(/noun:anim:.:v_...(:nv)?:prop:lname/) ) {
-                }
-                else {
-                    boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv(:abbr:prop:[fp]name|:prop:[fp]name:abbr)/
+//                if( ltTags2[0].startsWith("null") && token.matches("[А-ЯІЇЄҐ][а-яіїєґА-ЯІЇЄҐ'-]+") && tags.matches(/noun:anim:.:v_...(:nv)?:prop:lname/) ) {
+//                }
+//                {
+                    boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/
                     if( ! (tagPair in ltTags2) && ! initials ) {
                         if( token != "їх" || ! (tags ==~ /adj:[mfnp]:v_...(:r(in)?anim)?:nv:&pron:pos:bad/ ) ) {
                             
@@ -87,7 +93,7 @@ class Validator {
                         }
                         return
                     }
-                }
+//                }
             }
         }
     
@@ -101,6 +107,11 @@ class Validator {
             String tags = attributes['tags']
             String lemma = attributes['lemma']
             String token = attributes['value']
+            
+            if( tags =~ /unclass|punct|unknown|symbol/ ) {
+                tags = null
+            }
+            
             def tokens = Arrays.asList(new AnalyzedToken(token, tags, lemma))
             def atr = new AnalyzedTokenReadings(tokens, pos)
             pos += token.length() + 1
@@ -114,7 +125,7 @@ class Validator {
             matches.each {
                 def sample = xmls.collect{it.attributes()['value']}.join(' ')
                 sample = sample[it.fromPos..-1]
-                println "\trule violation: $it\n\t$sample"
+//                println "\trule violation: $it\n\t$sample"
                 errValidations[txtFile.name.replace('.txt', '.xml')] << "$it\n\t\t$sample".toString()
             }
         }
