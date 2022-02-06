@@ -11,3 +11,4 @@ comments/
 /.settings/
 err*
 *freqs*
+*.jfr
