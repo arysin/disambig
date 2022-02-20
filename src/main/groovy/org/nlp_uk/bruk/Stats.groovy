@@ -27,7 +27,6 @@ class Stats {
     Stats() {
         ignoreForStats = getClass().getResource('/ignore_for_stats.txt').readLines().findAll { it && ! it.startsWith('#') } as Set
         println "Ignoring for stats: ${ignoreForStats.size()} files"
-//        new Exception().printStackTrace()
     }
     
     @CompileStatic
@@ -78,67 +77,73 @@ class Stats {
                 freqs[lemma] += 1
                 
     //            def currCtxToken = ContextToken.normalized(token, lemma, postag)
-                if( idx > 0 ) {
-                    def ctxXml = tokenXmls[idx-1]
-                    Map<String, String> ctxAttrs = ctxXml.attributes()
-                    ContextToken ctxToken = ContextToken.normalized(ctxAttrs['value'], ctxAttrs['lemma'], ctxAttrs['tags'])
-                    def context = new WordContext(ctxToken, -1)
+                
+                [-1].each { int offset ->
+                
+                    ContextToken ctxToken = null
+                    def ctxXml = findCtx(tokenXmls, idx, offset) 
+
+                    if( ctxXml != null ) {                    
+                        Map<String, String> ctxAttrs = ctxXml.attributes()
+                        ctxToken = ContextToken.normalized(ctxAttrs['value'], ctxAttrs['lemma'], ctxAttrs['tags'])
+                        def context = new WordContext(ctxToken, offset)
+                    }
+                    else {
+                        ctxToken = new ContextToken('^', '^', offset < 0 ? "BEG" : "END")
+                    }
+                    def context = new WordContext(ctxToken, offset)
                     disambigStats[token][wordReading][context] += 1
                 }
-                else {
-                    def ctxToken = new ContextToken('^', '^', "BEG")
-                    def context = new WordContext(ctxToken, -1)
-                    disambigStats[token][wordReading][context] += 1
-                }
-    
-                if( idx < tokenXmls.size()-1 ) {
-                    def ctxXml = tokenXmls[idx+1]
-                    Map<String, String> ctxAttrs = ctxXml.attributes()
-                    ContextToken ctxToken = ContextToken.normalized(ctxAttrs['value'], ctxAttrs['lemma'], ctxAttrs['tags'])
-                    def context = new WordContext(ctxToken, +1)
-                    disambigStats[token][wordReading][context] += 1
-                }
-                else {
-                    def ctxToken = new ContextToken('^', '^', "END")
-                    def context = new WordContext(ctxToken, +1)
-                    disambigStats[token][wordReading][context] += 1
-                }
+                
             }
         }
     //    println "generateStats stats: ${freqs2.size()}"
     }
 
-    void writeStats() {
-//        stats.with {
+    @CompileStatic
+    Node findCtx(List<Node> tokensXml, int pos, int offset) {
+        for( ; pos+offset >= 0 && pos+offset < tokensXml.size()-1; offset++) {
+            if( ! isIgnorableCtx(tokensXml[pos+offset]) ) // TODO: stop at 1 skipped?
+                return tokensXml[pos+offset]
+        }
+        return null
+    }
+    
+    @CompileStatic
+    static boolean isIgnorableCtx(Node item) {
+        Map<String, String> ctxAttrs = item.attributes()
         
-            println "$count Ukrainian tokens"
-            println "$wordCount word/number tokens"
-            println "${words.size()} unique Ukrainian words"
-            println "${wordsNorm.size()} unique Ukrainian words (case-insensitive)"
-            println "${lemmas.size()} unique lemmas"
-        //    println "Tag freqs:\n" + pos1Freq.sort{k,v -> -v}.collect{k,v -> k.padRight(25) + " $v"}.join("\n")
-            
-        //    println "$multiWordCount multiword tags !!"
-            println "$multiTagCount tokens with multiple tags !!"
+        ctxAttrs['value'] in ContextToken.IGNORE_TOKENS
+    }
     
+    void writeStats() {
+        println "$count Ukrainian tokens"
+        println "$wordCount word/number tokens"
+        println "${words.size()} unique Ukrainian words"
+        println "${wordsNorm.size()} unique Ukrainian words (case-insensitive)"
+        println "${lemmas.size()} unique lemmas"
+    //    println "Tag freqs:\n" + pos1Freq.sort{k,v -> -v}.collect{k,v -> k.padRight(25) + " $v"}.join("\n")
+        
+    //    println "$multiWordCount multiword tags !!"
+        println "$multiTagCount tokens with multiple tags !!"
+
+        
+        java.text.Collator coll = java.text.Collator.getInstance(new Locale("uk", "UA"));
+        coll.setStrength(java.text.Collator.IDENTICAL)
+        coll.setDecomposition(java.text.Collator.NO_DECOMPOSITION)
+
+        // write stats
             
-            java.text.Collator coll = java.text.Collator.getInstance(new Locale("uk", "UA"));
-            coll.setStrength(java.text.Collator.IDENTICAL)
-            coll.setDecomposition(java.text.Collator.NO_DECOMPOSITION)
-    
-            // write stats
-                
-            freqs = freqs.toSorted { - it.value }
-            
-            def outFile = new File("lemma_freqs.txt")
-            outFile.text = ""
-            
-            freqs.each { k,v ->
-                outFile << "$v\t$k\n"
-            }
-            
-            writeDisambigStats(coll)
-//        }
+        freqs = freqs.toSorted { - it.value }
+        
+        def outFile = new File("lemma_freqs.txt")
+        outFile.text = ""
+        
+        freqs.each { k,v ->
+            outFile << "$v\t$k\n"
+        }
+        
+        writeDisambigStats(coll)
     }
      
     @CompileStatic
@@ -150,29 +155,33 @@ class Stats {
     
         println "Ignored for stats: $ignored"
         
-//        stats.with {
-            println "Writing ${disambigStats.size()} disambig stats..."
-            disambigStats
-                    .toSorted { a, b -> coll.compare a.getKey(), b.getKey() }
-                    .each { String token, Map<WordReading, Map<WordContext, Integer>> map1 ->
-                        map1
-                        .toSorted{ a, b -> b.getKey().getPostag().compareTo(a.getKey().getPostag()) }
-                        .each { WordReading wordReading, Map<WordContext, Integer> map2 ->
-    //                        outFileFreqFull << token.padRight(20) << "," << wordReading << ", " << stats.disambigStatsF[token][wordReading] << "\n"
-                            if( token in homonymTokens ) {
-                                outFileFreqHom << token << "\t\t" << wordReading << "\t" << disambigStatsF[token][wordReading] << "\n"
-                            }
-                            map2
-    //                        .toSorted{ a, b -> b.key.contextToken.word.compareTo(a.key.contextToken.word) }
-                            .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
-                            .each { WordContext wordContext, int value ->
-    //                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
-                                if( wordContext.getOffset() == -1 && token in homonymTokens ) {
-                                    outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << value << "\n"
-                                }
+        println "Writing ${disambigStats.size()} disambig stats..."
+        disambigStats
+            .toSorted { a, b -> coll.compare a.getKey(), b.getKey() }
+            .each { String token, Map<WordReading, Map<WordContext, Integer>> map1 ->
+                double tokenTotalRate = Double.valueOf(((Integer)disambigStatsF[token].values().sum()))
+                
+                map1
+                .toSorted{ a, b -> b.getKey().getPostag().compareTo(a.getKey().getPostag()) }
+                .each { WordReading wordReading, Map<WordContext, Integer> map2 ->
+//                        outFileFreqFull << token.padRight(20) << "," << wordReading << ", " << stats.disambigStatsF[token][wordReading] << "\n"
+                    if( token in homonymTokens ) {
+                        def rate = disambigStatsF[token][wordReading] / tokenTotalRate
+                        outFileFreqHom << token << "\t\t" << wordReading << "\t" << rate << "\n"
+                        
+                        map2
+//                        .toSorted{ a, b -> b.key.contextToken.word.compareTo(a.key.contextToken.word) }
+                        .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
+                        .each { WordContext wordContext, int value ->
+//                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
+                            if( wordContext.getOffset() == -1 ) {
+                                def rateCtx = value / tokenTotalRate
+                                outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << rateCtx << "\n"
                             }
                         }
                     }
+                }
+            }
     
         //    println ":: " + freqs2WithHoms.take(1)
                     
@@ -189,7 +198,5 @@ class Stats {
     //        int uniqFormsSumMain = freqs2Main.collect{ k,v -> v.values().sum(0) }.sum(0)
     //        int uniqFormsWithHomSumMain = freqs2WithHomsMain.collect{ k,v -> v.values().sum(0) }.sum(0)
     //        println "Total uniq forms main: ${uniqFormsSumMain}, with homonyms: ${uniqFormsWithHomSumMain}, ${(double)uniqFormsWithHomSumMain/uniqFormsSumMain}"
-        }
-//    }
-    
+    }
 }

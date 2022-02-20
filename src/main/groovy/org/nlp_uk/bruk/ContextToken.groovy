@@ -13,6 +13,7 @@ class ContextToken {
     static final Pattern POSTAG_CORE_REMOVE_PATTERN = Pattern.compile(/:(rare|arch|coll|slang|bad|vulg|ua_[0-9]{4})/)
     static final ContextToken BEG = new ContextToken('__BEG', '', 'BEG')
     static final ContextToken END = new ContextToken('__END', '', 'END')
+    static final String[] IGNORE_TOKENS = [] // ['б', 'би', 'ж'] 
     
     String word
     String lemma
