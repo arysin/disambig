@@ -78,7 +78,7 @@ class Stats {
                 
     //            def currCtxToken = ContextToken.normalized(token, lemma, postag)
                 
-                [-1].each { int offset ->
+                [-1, +1].each { int offset ->
                 
                     ContextToken ctxToken = null
                     def ctxXml = findCtx(tokenXmls, idx, offset) 
@@ -153,7 +153,7 @@ class Stats {
         def outFileFreqHom = new File("lemma_freqs_hom.txt")
         outFileFreqHom.text = ""
     
-        println "Ignored for stats: $ignored"
+        println "Ignored for stats:\n\t${ignored.join("\n\t")}"
         
         println "Writing ${disambigStats.size()} disambig stats..."
         disambigStats
@@ -174,10 +174,10 @@ class Stats {
                         .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
                         .each { WordContext wordContext, int value ->
 //                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
-                            if( wordContext.getOffset() == -1 ) {
+//                            if( wordContext.getOffset() == -1 ) {
                                 def rateCtx = value / tokenTotalRate
                                 outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << rateCtx << "\n"
-                            }
+//                            }
                         }
                     }
                 }

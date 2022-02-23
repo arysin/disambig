@@ -50,24 +50,27 @@ class ContextToken {
     static String safeguard(String w) {
         if( w == '' ) return '^'
 
-        w.indexOf(' ') >= 0 ? w.replace(' ', '\u2009') : w
+        w //w.indexOf(' ') >= 0 ? w.replace(' ', '\u2009') : w
     }
 
     @CompileStatic
     static String unsafeguard(String w) {
-        w = w.indexOf('\u2009') >= 0 ? w.replace('\u2009', ' ') : w
+        w //w = w.indexOf('\u2009') >= 0 ? w.replace('\u2009', ' ') : w
     }
 
     @CompileStatic
     static String normalizeContextString(String w, String lemma, String postag) {
         if( postag == "number" ) {
-            def m0 = Pattern.compile(/[12][0-9]{3}/).matcher(w) // preserve a year - often works as adj
+            def m0 = Pattern.compile(/([12][0-9]{3}[-–—])?[12][0-9]{3}/).matcher(w) // preserve a year - often works as adj
             if( m0.matches() )
                 return w
 
-            def m1 = Pattern.compile(/[0-9]+([0-9]{2})/).matcher(w) // we only care about last two digits
+            // normalize 10 000
+            w = w.replace(" ", "")
+                
+            def m1 = Pattern.compile(/([0-9]+[-–])?[0-9]+([0-9]{2})/).matcher(w) // we only care about last two digits
             if( m1.matches() )
-                return m1.replaceFirst('$1')
+                return m1.replaceFirst('$2')
 
             def m2 = Pattern.compile(/[0-9]+([,.])[0-9]+/).matcher(w) // we only care that it's decimal
             if( m2.matches() )
