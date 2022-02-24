@@ -6,7 +6,11 @@ import org.languagetool.AnalyzedSentence
 import org.languagetool.AnalyzedToken
 import org.languagetool.AnalyzedTokenReadings
 import org.languagetool.JLanguageTool
+import org.languagetool.Languages
 import org.languagetool.language.Ukrainian
+import org.languagetool.rules.Category
+import org.languagetool.rules.CategoryIds
+import org.languagetool.rules.Rule
 import org.languagetool.rules.RuleMatch
 import org.languagetool.rules.uk.TokenAgreementAdjNounRule
 import org.languagetool.rules.uk.TokenAgreementNounVerbRule
@@ -28,7 +32,6 @@ class Validator {
         new TokenAgreementPrepNounRule(messages)]
     Stats stats
     
-    
     Map<String, List<String>> errValidations = [:].withDefault{ [] }
     List<String> errUnverified = []
     
@@ -38,7 +41,14 @@ class Validator {
         allTags = getClass().getResource('/ukrainian_tags.txt').readLines() as Set
         allTags += [ 'punct', 'number', 'number:latin', 'time', 'date', 'unclass', 'unknown', 'symb', 'hashtag' ]
     
-//        validationRules += new Ukrainian().getPatternRules()
+        def lt = new JLanguageTool(Languages.getLanguageForShortCode("uk"), [], null, null, null, null)
+        def uk = lt.getLanguage()
+        
+        def xmlRules = uk.getPatternRules().findAll { Rule r -> 
+            r.getCategory().getId() == CategoryIds.GRAMMAR && r.getId() =~ "(?i)(CONSISTENCY.*NUMERIC|PIVTORA|PRIZVY|LAST_NAME|MODAL)"
+        }
+        println "Added ${xmlRules.size()} xml rules"
+        validationRules += xmlRules
     }
     
     @CompileStatic
@@ -124,7 +134,9 @@ class Validator {
             RuleMatch[] matches = rule.match(sent)
             matches.each {
                 def sample = xmls.collect{it.attributes()['value']}.join(' ')
-                sample = sample[it.fromPos..-1]
+                int fromPos = it.fromPos - 15
+                if( fromPos < 0 ) fromPos = 0 
+                sample = sample[fromPos..-1]
 //                println "\trule violation: $it\n\t$sample"
                 errValidations[txtFile.name.replace('.txt', '.xml')] << "$it\n\t\t$sample".toString()
             }

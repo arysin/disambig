@@ -153,7 +153,7 @@ class Stats {
         def outFileFreqHom = new File("lemma_freqs_hom.txt")
         outFileFreqHom.text = ""
     
-        println "Ignored for stats:\n\t${ignored.join("\n\t")}"
+        println "Ignored for stats:\n\t${ignored.toSorted().join("\n\t")}"
         
         println "Writing ${disambigStats.size()} disambig stats..."
         disambigStats
