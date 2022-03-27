@@ -8,6 +8,7 @@ import groovy.transform.CompileStatic
 class Stats {
     static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
+    static final boolean allContexts = false
     
     int count = 0
     int wordCount = 0
@@ -25,8 +26,10 @@ class Stats {
     Set<String> ignoreForStats
     
     Stats() {
-        ignoreForStats = getClass().getResource('/ignore_for_stats.txt').readLines().findAll { it && ! it.startsWith('#') } as Set
-        println "Ignoring for stats: ${ignoreForStats.size()} files"
+        if( ! Boolean.getBoolean("full") ) {
+            ignoreForStats = getClass().getResource('/ignore_for_stats.txt').readLines().findAll { it && ! it.startsWith('#') } as Set
+            println "Ignoring for stats: ${ignoreForStats.size()} files"
+        }
     }
     
     @CompileStatic
@@ -174,10 +177,10 @@ class Stats {
                         .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
                         .each { WordContext wordContext, int value ->
 //                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
-//                            if( wordContext.getOffset() == -1 ) {
+                            if( allContexts || wordContext.getOffset() == -1 ) {
                                 def rateCtx = value / tokenTotalRate
                                 outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << rateCtx << "\n"
-//                            }
+                            }
                         }
                     }
                 }

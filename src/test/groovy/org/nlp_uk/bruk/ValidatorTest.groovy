@@ -2,6 +2,8 @@ package org.nlp_uk.bruk;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.Disabled
+
 import groovy.xml.slurpersupport.GPathResult
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +22,7 @@ class ValidatorTest {
 """
     
     @Test
-    void test() {
+    void test1() {
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
@@ -69,5 +71,24 @@ String str3=
             assertEquals 1, validator.errValidations.size()
 
         }
-    
+
+String str4 =
+"""
+<text>
+  <token value="таке" lemma="такий" tags="adj:n:v_zna:&amp;pron:dem" />
+  <token value="об'єднання" lemma="об'єднання" tags="noun:inanim:p:v_naz" />
+</text>
+"""
+
+    @Test
+    void test4() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str4)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        def validator = new Validator(new Stats())
+        validator.validateSentence(nodes, new File("1.txt"))
+        
+        assertEquals 1, validator.errValidations.size()
+    }
+
 }

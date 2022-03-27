@@ -28,4 +28,9 @@
     <root level="info">
         <appender-ref ref="stdout" />
     </root>
+
+    <logger name="org.languagetool.rules.uk" additivity="false">
+        <level value="info"/>
+        <appender-ref ref="stdout"/>
+    </logger>
 </configuration>
