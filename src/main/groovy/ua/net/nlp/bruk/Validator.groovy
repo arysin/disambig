@@ -1,4 +1,4 @@
-package org.nlp_uk.bruk
+package ua.net.nlp.bruk
 
 import java.util.regex.Pattern
 
@@ -14,6 +14,7 @@ import org.languagetool.rules.Rule
 import org.languagetool.rules.RuleMatch
 import org.languagetool.rules.uk.TokenAgreementAdjNounRule
 import org.languagetool.rules.uk.TokenAgreementNounVerbRule
+import org.languagetool.rules.uk.TokenAgreementNumrNounRule
 import org.languagetool.rules.uk.TokenAgreementPrepNounRule
 import org.languagetool.tagging.uk.UkrainianTagger
 
@@ -29,6 +30,7 @@ class Validator {
     List<org.languagetool.rules.Rule> validationRules = 
         [new TokenAgreementNounVerbRule(messages),
         new TokenAgreementAdjNounRule(messages),
+        new TokenAgreementNumrNounRule(messages),
         new TokenAgreementPrepNounRule(messages)]
     Stats stats
     
@@ -45,7 +47,7 @@ class Validator {
         def uk = lt.getLanguage()
         
         def xmlRules = uk.getPatternRules().findAll { Rule r -> 
-            r.getCategory().getId() == CategoryIds.GRAMMAR && r.getId() =~ "(?i)(CONSISTENCY.*NUMERIC|PIVTORA|PRIZVY|LAST_NAME|MODAL)"
+            r.getCategory().getId() == CategoryIds.GRAMMAR && r.getId() =~ "(?i)(CONSISTENCY.*NUMERIC|PIVTORA|PRIZVY|LAST_NAME|MODAL)" //|token_agreement_noun_noun)"
         }
         println "Added ${xmlRules.size()} xml rules"
         validationRules += xmlRules
@@ -57,7 +59,7 @@ class Validator {
         assert lemma != null, "no lemma for token $token"
         
         if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
-            if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/ ) ) {
+            if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mfp]:v_...:nv:abbr:prop:[fp]name/ ) ) {
                 println "\tInvalid tag: $tags for $token"
                 errValidations[txtFile.name.replace('.txt', '.xml')] << "Invalid tag: $tags for $token".toString()
                 return false
@@ -152,14 +154,14 @@ class Validator {
 
         // write warnings
         
-        new File("err_unverified.txt").text = errUnverified.collect{ def s = it.toString()
+        new File("out/err_unverified.txt").text = errUnverified.collect{ def s = it.toString()
             s =~ /^[^а-яіїєґ]/ ? "* $s".toString() : s.toString()
         }
             .toSorted(coll)
             .collect{ it.replaceFirst(/^\* /, '') }
             .join("\n")
 
-        new File("err_validations.txt").text = errValidations.collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
+        new File("out/err_validations.txt").text = errValidations.collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
 
     }    
 }
