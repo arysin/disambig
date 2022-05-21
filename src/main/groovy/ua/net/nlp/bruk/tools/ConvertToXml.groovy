@@ -1,6 +1,6 @@
 #!/bin/env groovy
 
-package org.nlp_uk.bruk.tools
+package ua.net.nlp.bruk.tools
 
 @Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
 
@@ -250,13 +250,13 @@ java.text.Collator coll = java.text.Collator.getInstance(new Locale("uk", "UA"))
 coll.setStrength(java.text.Collator.IDENTICAL)
 coll.setDecomposition(java.text.Collator.NO_DECOMPOSITION)
 
-def nullTagsFile = new File("err_null_tags.txt")
+def nullTagsFile = new File("out/err_null_tags.txt")
 nullTagsFile.text = nullTags.collect{ it.toString() }.toSorted(coll).join("\n")
 
-def parseFailuresFile = new File("err_parse_failures.txt")
+def parseFailuresFile = new File("out/err_parse_failures.txt")
 parseFailuresFile.text = parseFailues.collect{ it.toString() }.toSorted(coll).join("\n")
 
-//def dupsFile = new File("err_dups.txt")
+//def dupsFile = new File("out/err_dups.txt")
 //dupsFile.text = titles.findAll { k,v -> v.size() > 1 }.collect{ k,v -> "$k\n\t"+ v.join("\n\t") }.join("\n")
 
 

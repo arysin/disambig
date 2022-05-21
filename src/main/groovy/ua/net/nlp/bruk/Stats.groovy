@@ -1,4 +1,4 @@
-package org.nlp_uk.bruk
+package ua.net.nlp.bruk
 
 import java.util.regex.Pattern
 import groovy.xml.slurpersupport.Node
@@ -139,7 +139,7 @@ class Stats {
             
         freqs = freqs.toSorted { - it.value }
         
-        def outFile = new File("lemma_freqs.txt")
+        def outFile = new File("out/lemma_freqs.txt")
         outFile.text = ""
         
         freqs.each { k,v ->
@@ -153,7 +153,7 @@ class Stats {
     void writeDisambigStats(java.text.Collator coll) {
     //    def outFileFreqFull = new File("lemma_freqs_full.txt")
     //    outFileFreqFull.text = ""
-        def outFileFreqHom = new File("lemma_freqs_hom.txt")
+        def outFileFreqHom = new File("out/lemma_freqs_hom.txt")
         outFileFreqHom.text = ""
     
         println "Ignored for stats:\n\t${ignored.toSorted().join("\n\t")}"

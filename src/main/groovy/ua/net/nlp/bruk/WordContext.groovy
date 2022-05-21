@@ -1,4 +1,4 @@
-package org.nlp_uk.bruk
+package ua.net.nlp.bruk
 
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic

@@ -1,6 +1,6 @@
 #!/bin/env groovy
 
-package org.nlp_uk.bruk.tools
+package ua.net.nlp.bruk.tools
 
 def names = [] as Set
 

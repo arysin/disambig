@@ -1,6 +1,6 @@
 #!/bin/env groovy
 
-package org.nlp_uk.bruk
+package ua.net.nlp.bruk
 
 //@Grab(group='org.languagetool', module='language-uk', version='5.7-SNAPSHOT')
 //@Grab(group='org.apache.commons', module='commons-csv', version='1.9.0')

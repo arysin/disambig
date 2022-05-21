@@ -1,6 +1,6 @@
 #!/bin/env groovy
 
-package org.nlp_uk.bruk.tools
+package ua.net.nlp.bruk.tools
 
 @Grab(group='org.apache.commons', module='commons-csv', version='1.9.0')
 
