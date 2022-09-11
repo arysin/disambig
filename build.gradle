@@ -16,9 +16,9 @@ repositories {
 
 
 dependencies {
-    implementation group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.10', classifier: 'indy'
-//    implementation group: 'org.codehaus.groovy', name: 'groovy-json', version: '3.0.9', classifier: 'indy'
-    implementation group: 'org.codehaus.groovy', name: 'groovy-xml', version: '3.0.10', classifier: 'indy'
+    implementation group: groovyGroup, name: 'groovy', version: groovyVersion
+//    implementation group: groovyGroup, name: 'groovy-json', version: groovyVersion, classifier: groovyClassifier
+    implementation group: groovyGroup, name: 'groovy-xml', version: groovyVersion
 
     implementation group:'ch.qos.logback', name:'logback-classic', version:'1.2.10'
     implementation group: 'org.apache.commons', name: 'commons-csv', version: '1.9.0'
@@ -73,7 +73,7 @@ test {
 
 task run(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
-    main = "org.nlp_uk.bruk.ReadXml"
+    mainClass = "ua.net.nlp.bruk.ReadXml"
 
     jvmArgs '-Dgroovy.grape.enable=false'
 
