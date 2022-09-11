@@ -16,6 +16,7 @@ import org.languagetool.rules.uk.TokenAgreementAdjNounRule
 import org.languagetool.rules.uk.TokenAgreementNounVerbRule
 import org.languagetool.rules.uk.TokenAgreementNumrNounRule
 import org.languagetool.rules.uk.TokenAgreementPrepNounRule
+import org.languagetool.rules.uk.TokenAgreementVerbNounRule
 import org.languagetool.tagging.uk.UkrainianTagger
 
 import groovy.transform.CompileStatic
@@ -31,7 +32,9 @@ class Validator {
         [new TokenAgreementNounVerbRule(messages),
         new TokenAgreementAdjNounRule(messages),
         new TokenAgreementNumrNounRule(messages),
-        new TokenAgreementPrepNounRule(messages)]
+        new TokenAgreementPrepNounRule(messages),
+        new TokenAgreementVerbNounRule(messages),
+        ]
     Stats stats
     
     Map<String, List<String>> errValidations = [:].withDefault{ [] }
@@ -81,7 +84,13 @@ class Validator {
             if( tags == "null" ) {
                 System.err.println "null tag for $token"
             }
-            else if( ! tags.startsWith("noninfl") && ! tags.startsWith("unclass") ) { //! (token =~ /^[А-ЯІЇЄҐA-Z].*/ ) ){
+            else if( tags.startsWith("noninfl") || tags.startsWith("unclass") ) {
+                
+            }
+            else {
+                if( tags == "part" && token ==~ /-(бо|но|то|от|таки)/ && token == "-" + lemma )
+                    return
+                
                 AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
                 
                 if( ltTags.getReadings().size() > 1 ) {
@@ -100,7 +109,7 @@ class Validator {
                     if( ! (tagPair in ltTags2) && ! initials ) {
                         if( token != "їх" || ! (tags ==~ /adj:[mfnp]:v_...(:r(in)?anim)?:nv:&pron:pos:bad/ ) ) {
                             
-                            errUnverified << "$tagPair (token: $token) (avail: $ltTags2)".toString()
+                            errUnverified << "value=\"$token\" lemma=\"${tagPair.replace('/', '\" tags=\"')}\"  (avail: $ltTags2)".toString()
                     //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
                         }
                         return
@@ -154,11 +163,11 @@ class Validator {
 
         // write warnings
         
-        new File("out/err_unverified.txt").text = errUnverified.collect{ def s = it.toString()
-            s =~ /^[^а-яіїєґ]/ ? "* $s".toString() : s.toString()
-        }
+        new File("out/err_unverified.txt").text = errUnverified.collect{ 
+                it.replaceFirst(/(value=")([^а-яіїєґ])/, '$1* $2').toString()
+            }
             .toSorted(coll)
-            .collect{ it.replaceFirst(/^\* /, '') }
+            .collect{ it.replace('="* ', '="') }
             .join("\n")
 
         new File("out/err_validations.txt").text = errValidations.collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")

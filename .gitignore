@@ -2,13 +2,10 @@
 /build/
 .classpath
 .project
-*.bak
+/.settings/
 .gradle
+*.bak
 xml/
 txt/
-try/
-comments/
-/.settings/
-err*
-*freqs*
+out/
 *.jfr

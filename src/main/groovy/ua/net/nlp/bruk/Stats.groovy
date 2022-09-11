@@ -10,7 +10,8 @@ class Stats {
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
     static final boolean allContexts = false
     
-    int count = 0
+    int totalCount = 0
+    int ukWordCount = 0
     int wordCount = 0
     int multiTagCount = 0
     boolean sentence = false
@@ -50,9 +51,11 @@ class Stats {
     @CompileStatic
     void addToStats(String token, String lemma, String tags) {
         pos1Freq[keyPos(tags)]++
+
+        totalCount++
         
         if( UKR_LEMMA.matcher(lemma).matches() ) {
-            count++
+            ukWordCount++
             words[token]++
             wordsNorm[normalize(token, lemma)]++
             lemmas[lemma]++
@@ -120,7 +123,8 @@ class Stats {
     }
     
     void writeStats() {
-        println "$count Ukrainian tokens"
+        println "$totalCount total tokens"
+        println "$ukWordCount Ukrainian tokens"
         println "$wordCount word/number tokens"
         println "${words.size()} unique Ukrainian words"
         println "${wordsNorm.size()} unique Ukrainian words (case-insensitive)"

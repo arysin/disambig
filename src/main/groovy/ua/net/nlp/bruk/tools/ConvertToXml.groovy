@@ -2,7 +2,7 @@
 
 package ua.net.nlp.bruk.tools
 
-@Grab(group='org.languagetool', module='language-uk', version='5.6-SNAPSHOT')
+@Grab(group='org.languagetool', module='language-uk', version='5.8')
 
 import static groovy.io.FileType.FILES
 
