@@ -24,6 +24,9 @@ import org.languagetool.rules.RuleMatch
 import org.languagetool.AnalyzedSentence
 import org.languagetool.JLanguageTool
 
+import ua.net.nlp.bruk.Stats
+import ua.net.nlp.bruk.Validator
+
 
 @Field
 Stats stats = new Stats()
@@ -44,8 +47,7 @@ boolean produceTxt = false
 //void main2() {
     
 //    ExecutorService executor = Executors.newFixedThreadPool(8)
-//    def futures = new ArrayBlockingQueue<>(100)   // we need to poll for futures in order to keep the queue busy
-
+//    List<Future<GPathResult>> futures = new ArrayList<>(100)   // we need to poll for futures in order to keep the queue busy
 
     File txt2Folder = new File("txt/gen")
     txt2Folder.mkdirs()
@@ -68,17 +70,19 @@ boolean produceTxt = false
         assert new File("txt/orig/$origName").isFile()
     
         
-//       futures << executor.submit {
+//       futures << executor.submit({
             GPathResult xml = new groovy.xml.XmlSlurper().parseText(inText)
-//        } as Callable
+//            return [xml, txtFile]
+//        } as Callable<List>)
         
 //        txtFile << "\n"
 //    }
-//
-//        executor.shutdown()
-//        
+
+//    println "Got ${futures.size()} futures"
+    
 //    futures.each { Future xmlF ->
-//        xml = xmlF.get()
+//        def lst = xmlF.get()
+//        def (xml, txtFile) = lst
         
         Iterator<Node> childNodes = xml.childNodes()
         sentIdx = 0
@@ -87,7 +91,9 @@ boolean produceTxt = false
             processItem(txtFile, it, idx)
         }
     }
-       
+    
+//    executor.shutdown()
+    
     validator.writeErrors()
     stats.writeStats()
 //} 
