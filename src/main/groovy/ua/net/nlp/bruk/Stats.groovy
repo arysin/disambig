@@ -18,6 +18,8 @@ class Stats {
     Map<String, Integer> freqs = [:].withDefault{ 0 }
     Map<String, Map<WordReading, Map<WordContext, Integer>>> disambigStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
     Map<String, Map<WordReading, Integer>> disambigStatsF = [:].withDefault { [:].withDefault { 0 } }
+//    Map<String, Map<WordReading, Map<WordContext, Integer>>> lemmaSuffixStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
+    Map<String, Map<WordReading, Integer>> lemmaSuffixStatsF = [:].withDefault { [:].withDefault { 0 } }
     Map<String, Integer> words = [:].withDefault{ 0 }
     Map<String, Integer> wordsNorm = [:].withDefault{ 0 }
     Map<String, Integer> lemmas = [:].withDefault{ 0 }
@@ -61,7 +63,17 @@ class Stats {
             lemmas[lemma]++
         }
     }
-    
+
+    @CompileStatic
+    static int findCommon(String s1, String s2) {
+        int i;
+        for(i=0; i<s1.length() && i<s2.length(); i++) {
+            if( s1.charAt(i) != s2.charAt(i) )
+                break
+        }
+        return i
+    }
+        
     @CompileStatic
     void generateStats(List<Node> tokenXmls, File txtFile) {
         if( (txtFile.name in ignoreForStats) ) {
@@ -78,7 +90,9 @@ class Stats {
     
             WordReading wordReading = new WordReading(lemma, postag)
             disambigStatsF[token][wordReading] += 1
-            
+
+            addLemmaSuffixStats(token, lemma, postag)
+
             if( postag != null && MAIN_POS.matcher(postag).find() ) {
                 freqs[lemma] += 1
                 
@@ -106,6 +120,47 @@ class Stats {
     //    println "generateStats stats: ${freqs2.size()}"
     }
 
+    @CompileStatic
+    void addLemmaSuffixStats(String token, String lemma, String postag) {
+        int lemmaSuffixLen = 4
+        if( token.length() > lemmaSuffixLen
+                && postag =~ /^(noun|adj|verb|adv)/
+                && ! (postag =~ /(bad|arch|slang|pron|abbr)/)
+                && ! (token =~ /^[0-9]/) ) { // аадського -> ого | ий/3
+
+            if( token.endsWith("ться") ) {
+                lemmaSuffixLen += 2
+            }
+                
+            String adjustedToken = postag =~ /prop|abbr/ ? token : token.toLowerCase()
+            String adjustedPostag = postag.replaceAll(/:(xp[0-9]|comp.|&predic|&insert|&numr|&adjp:....:(im)?perf|ua_....)/, '')
+            int commonLength = findCommon(adjustedToken, lemma)
+            if( commonLength == 0 ) {
+                commonLength = findCommon(token, lemma)
+//                    assert commonLength, token
+                if( commonLength < 2 ) {
+                        println "skipping for lemma suffixes: $token"
+                    return
+                }
+            }
+            
+            int dashIdx = token.indexOf('-')
+            if( dashIdx >= commonLength ) {
+//                    println "skipping for lemma suffixes (hyphened): $token"
+                return
+            }
+            
+            def add = lemma.substring(commonLength, lemma.length())
+//                assert add.length() <= 1, token
+            def dropN = adjustedToken.length()-commonLength
+            def lemmaSuffix = "$add/$dropN"
+            WordReading wordReadingLemmaSuffix = new WordReading(lemmaSuffix, adjustedPostag)
+            def tokenSuffix = adjustedToken[-lemmaSuffixLen..-1]
+            lemmaSuffixStatsF[tokenSuffix][wordReadingLemmaSuffix] += 1
+        }
+
+    }
+    
     @CompileStatic
     Node findCtx(List<Node> tokensXml, int pos, int offset) {
         for( ; pos+offset >= 0 && pos+offset < tokensXml.size()-1; offset++) {
@@ -189,7 +244,20 @@ class Stats {
                     }
                 }
             }
-    
+
+        def outFileLemmaSuffixFreqHom = new File("out/lemma_suffix_freqs.txt")
+        outFileLemmaSuffixFreqHom.text = ""
+
+        lemmaSuffixStatsF
+            .toSorted { a, b -> coll.compare a.getKey(), b.getKey() }
+            .each { String token, Map<WordReading, Integer> map1 ->
+                map1
+                .toSorted{ a, b -> b.getKey().getPostag().compareTo(a.getKey().getPostag()) }
+                .each { WordReading wordReading, Integer rate ->
+                    outFileLemmaSuffixFreqHom << token << "\t\t" << wordReading << "\t" << rate << "\n"
+                }
+            }
+                
         //    println ":: " + freqs2WithHoms.take(1)
                     
     //        int uniqForms = disambigStats.size()
