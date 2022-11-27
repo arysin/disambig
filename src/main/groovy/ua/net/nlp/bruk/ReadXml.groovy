@@ -2,9 +2,6 @@
 
 package ua.net.nlp.bruk
 
-//@Grab(group='org.languagetool', module='language-uk', version='5.7-SNAPSHOT')
-//@Grab(group='org.apache.commons', module='commons-csv', version='1.9.0')
-
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic
 import groovy.transform.Field
@@ -49,10 +46,10 @@ boolean produceTxt = false
 //    ExecutorService executor = Executors.newFixedThreadPool(8)
 //    List<Future<GPathResult>> futures = new ArrayList<>(100)   // we need to poll for futures in order to keep the queue busy
 
-    File txt2Folder = new File("txt/gen")
-    txt2Folder.mkdirs()
+    File txt2Folder = new File("../txt/gen")
+//    txt2Folder.mkdirs()
     
-    def files = new File("xml").listFiles().sort{ it.name }
+    def files = new File("../corpus/data/disambig").listFiles().sort{ it.name }
     files.each { File file->
         if( ! file.name.endsWith('.xml') ) {
             System.err.println "Unknown file: ${file.name}"
@@ -229,6 +226,8 @@ private void printNode(File txtFile, Node node, int childIdx) {
 }
 
 
+@Field
+ContextToken prevToken = new ContextToken('', '', '')
 
 @CompileStatic
 void validateToken(Node xml, File txtFile) {
@@ -244,6 +243,8 @@ void validateToken(Node xml, File txtFile) {
         stats.addToStats(token, lemma, tags)
     }
 
-    validator.validateToken2(token, lemma, tags, txtFile)
+    validator.validateToken2(token, lemma, tags, txtFile, prevToken)
+    
+    prevToken = new ContextToken(token, lemma, tags)
 }
 

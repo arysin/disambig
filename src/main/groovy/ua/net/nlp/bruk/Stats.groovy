@@ -8,7 +8,8 @@ import groovy.transform.CompileStatic
 class Stats {
     static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
-    static final boolean allContexts = false
+    static final boolean useRightContext = false
+    static final String statsVersion = "3.1.0"
     
     int totalCount = 0
     int ukWordCount = 0
@@ -212,8 +213,9 @@ class Stats {
     void writeDisambigStats(java.text.Collator coll) {
     //    def outFileFreqFull = new File("lemma_freqs_full.txt")
     //    outFileFreqFull.text = ""
-        def outFileFreqHom = new File("out/lemma_freqs_hom.txt")
-        outFileFreqHom.text = ""
+        def dir = Boolean.getBoolean("full") ? "out/full/" : "out/"
+        def outFileFreqHom = new File(dir, "lemma_freqs_hom.txt")
+        outFileFreqHom.text = "# version: $statsVersion\n"
     
         println "Ignored for stats:\n\t${ignored.toSorted().join("\n\t")}"
         
@@ -236,7 +238,7 @@ class Stats {
                         .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
                         .each { WordContext wordContext, int value ->
 //                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
-                            if( allContexts || wordContext.getOffset() == -1 ) {
+                            if( useRightContext || wordContext.getOffset() == -1 ) {
                                 def rateCtx = value / tokenTotalRate
                                 outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << rateCtx << "\n"
                             }
