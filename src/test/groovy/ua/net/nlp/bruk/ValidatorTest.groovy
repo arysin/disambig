@@ -126,6 +126,44 @@ String str4 =
         def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
+        assertEquals 0, validator.errValidations.size()
+    }
+
+    String str71 =
+    """
+<text>
+  <token value="позбавлені" lemma="позбавлений" tags="adj:p:v_naz:&amp;adjp:pasv:perf" />
+  <token value="батьківських" lemma="батьківський" tags="adj:p:v_rod" />
+</text>
+"""
+    
+    String str72 =
+"""
+<text>
+  <token value="інші" lemma="інший" tags="adj:p:v_zna:rinanim:&amp;pron:def" />
+  <token value="гірші" lemma="гірший" tags="adj:p:v_naz:compc" />
+</text>
+"""
+
+    @Test
+    void test7AdjAdj() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str71)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        def validator = new Validator(new Stats())
+        validator.validateSentence(nodes, new File("1.txt"))
+        
+        assertEquals 0, validator.errValidations.size()
+    }
+    
+    @Test
+    void test72AdjAdj() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str72)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        def validator = new Validator(new Stats())
+        validator.validateSentence(nodes, new File("1.txt"))
+        
         assertEquals 1, validator.errValidations.size()
     }
 
