@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 
 
 class ValidatorTest {
-
+    def validator = new Validator(new Stats())
+    
     String str=
 """
 <text>
@@ -26,7 +27,6 @@ class ValidatorTest {
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
-        def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
         def map = [:]
@@ -56,7 +56,6 @@ String str3=
             GPathResult xml = new groovy.xml.XmlSlurper().parseText(str2)
             List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
             
-            def validator = new Validator(new Stats())
             validator.validateSentence(nodes, new File("1.txt"))
             
 //            def map = ['x':['y']]
@@ -85,7 +84,6 @@ String str4 =
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str4)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
-        def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
         assertEquals 1, validator.errValidations.size()
@@ -104,7 +102,6 @@ String str4 =
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str5)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
-        def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
         assertEquals 0, validator.errValidations.size()
@@ -123,7 +120,6 @@ String str4 =
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str6)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
-        def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
         assertEquals 0, validator.errValidations.size()
@@ -150,7 +146,6 @@ String str4 =
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str71)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
-        def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
         assertEquals 0, validator.errValidations.size()
@@ -161,10 +156,27 @@ String str4 =
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str72)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
         
-        def validator = new Validator(new Stats())
         validator.validateSentence(nodes, new File("1.txt"))
         
         assertEquals 1, validator.errValidations.size()
+    }
+    
+    String str8 =
+"""
+<text>
+  <token value="це" lemma="це" tags="noun:inanim:n:v_naz:&amp;pron:dem" />
+  <token value="була" lemma="бути" tags="verb:imperf:past:f" />
+</text>
+"""
+    
+    @Test
+    void test8() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str8)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        validator.validateSentence(nodes, new File("1.txt"))
+        
+        assertEquals 0, validator.errValidations.size()
     }
 
 }

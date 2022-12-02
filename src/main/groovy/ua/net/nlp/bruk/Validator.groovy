@@ -152,24 +152,26 @@ class Validator {
 //                }
             }
             
+            String xmlFileName = txtFile.name.replace('.txt', '.xml')
+            
             if( postag =~ /.*:p:v_naz.*/ ) {
                 if( prevToken.word.toLowerCase() == "є" && prevToken.postag =~ /:s:3/ ) {
-                    errUnverified << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
+                    errValidations[xmlFileName] << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
                 }
             }
             if( postag =~ /.*:[mnfs]:v_naz.*/ ) {
                 if( prevToken.word.toLowerCase() == "є" && prevToken.postag =~ /:p:3/ ) {
-                    errUnverified << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
+                    errValidations[xmlFileName] << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
                 }
             }
             if( token.toLowerCase() == "є" && postag =~ /:s:3/ ) {
                 if( prevToken.postag =~ /.*:p:v_naz.*/ ) {
-                    errUnverified << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
+                    errValidations[xmlFileName] << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
                 }
             }
             if( token.toLowerCase() == "є" && postag =~ /:p:3/ ) {
                 if( prevToken.postag =~ /.*:[mnfs]:v_naz.*/ ) {
-                    errUnverified << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
+                    errValidations[xmlFileName] << "value=\"$token\" lemma=\"$lemma\" tags=\"$postag\" (prev: $prevToken)".toString()
                 }
             }
         }
