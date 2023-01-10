@@ -76,7 +76,7 @@ class Validator {
         
         if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
             if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mfp]:v_...:nv:abbr:prop:[fp]name/ ) ) {
-                println "\tInvalid tag: $tags for $token"
+//                println "\tInvalid tag: $tags for $token"
                 errValidations[xmlFilename] << "Invalid tag: $tags for $token".toString()
                 return false
             }
@@ -84,13 +84,13 @@ class Validator {
 
         if( tags.contains(":prop") && lemma =~ /^[а-яіїєґ]/ 
                 || tags.startsWith("noun") && ! tags.contains(":prop") && ! tags.contains(":abbr") && lemma =~ /^[А-ЯІЇЄҐ]([а-яіїєї].*|$)/ ) {
-            println "\tInvalid tag: $tags for $token"
+//            println "\tInvalid tag: $tags for $token"
             errValidations[xmlFilename] << "Invalid tag: $tags for $token".toString()
             return false
         }
             
         if( tags.contains(":nv") && lemma.toLowerCase() != token.toLowerCase() ) {
-            println "\tInvalid tag: $tags for $token"
+//            println "\tInvalid tag: $tags for $token"
             errValidations[xmlFilename] << "Lemma $lemma mismatches $token for $tags".toString()
             return false
         }
@@ -223,19 +223,26 @@ class Validator {
             def reading0 = readings.get(ii-1)
             def r1 = reading1.getReadings().get(0)
             def r0 = reading0.getReadings().get(0)
-            if( r0.getPOSTag() == null || r1.getPOSTag() == null )
-                continue;
+
+            def r0POSTag = r0.getPOSTag()
+            def r1POSTag = r1.getPOSTag()
             
-            if( r1.getPOSTag().startsWith("adj")
-                    && r0.getPOSTag().startsWith("adj") ) {
+            if( r0POSTag== null || r1POSTag == null )
+                continue;
+
+            if( r0POSTag =~ /^numr:.:v_(rod|dav|oru|mis)/ ) {
+                r0POSTag = r0POSTag.replaceFirst(/^numr/, 'adj')
+            }
+                            
+            if( r0POSTag.startsWith("adj") && r1POSTag.startsWith("adj") ) {
                 
-                Matcher m1 = r1.getPOSTag() =~ /adj:.:(v_...)(:r(in)?anim)?/
-                Matcher m0 = r0.getPOSTag() =~ /adj:.:(v_...)(:r(in)?anim)?/
+                Matcher m0 = r0POSTag =~ /adj:.:(v_...)(:r(in)?anim)?/
+                Matcher m1 = r1POSTag =~ /adj:.:(v_...)(:r(in)?anim)?/
                 
                 if( m1[0] != m0[0] ) {
                     if( r0.getToken() =~ /^[0-9]+-[а-яіїєґ]+/
-                        || (r0.getPOSTag() =~ /adjp:pasv:perf/ 
-                            && r1.getPOSTag() =~ /adj:.:v_oru/)
+                        || (r0POSTag=~ /adjp:pasv:perf/ 
+                            && r1POSTag =~ /adj:.:v_oru/)
                             || r0.getLemma() =~ /^(який|котрий|кожен)$/
                             || CaseGovernmentHelper.hasCaseGovernment(reading0, m1.group(1)) )
                         continue
@@ -364,7 +371,7 @@ class Validator {
             .collect{ it.replace('="* ', '="') }
             .join("\n")
 
-        new File("out/err_validations.txt").text = errValidations.collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
+        new File("out/err_validations.txt").text = errValidations.toSorted{ e -> e.getKey() }.collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
 
     }    
 }

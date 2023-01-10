@@ -10,6 +10,9 @@ import groovy.xml.slurpersupport.Node
 import groovy.xml.slurpersupport.Attribute
 
 import java.util.regex.Pattern
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVPrinter
@@ -42,7 +45,8 @@ boolean produceTxt = false
 
 
 //void main2() {
-    
+    @Field
+    ExecutorService executor = Executors.newSingleThreadExecutor();
 //    ExecutorService executor = Executors.newFixedThreadPool(8)
 //    List<Future<GPathResult>> futures = new ArrayList<>(100)   // we need to poll for futures in order to keep the queue busy
 
@@ -89,10 +93,14 @@ boolean produceTxt = false
         }
     }
     
-//    executor.shutdown()
+    executor.shutdown()
+    executor.awaitTermination(30, TimeUnit.SECONDS)
     
     validator.writeErrors()
+    long tm1 = System.currentTimeMillis()
     stats.writeStats()
+    long tm2 = System.currentTimeMillis()
+    println "stats took ${tm2-tm1}"
 //} 
 
 //new ReadXml().main2()
@@ -129,9 +137,11 @@ private void processItem(File txtFile, Node xml, int childIdx) {
             }
         }
 
-        validator.validateSentence(tokenXmls, txtFile)
+        executor.execute {  
+            validator.validateSentence(tokenXmls, txtFile)
+            stats.generateStats(tokenXmls, txtFile)
+        } as Runnable
         
-        stats.generateStats(tokenXmls, txtFile)
     }
     else if( childNodes
             && ! ((Node)childNodes[0]).name() == "alts" ) {
@@ -240,7 +250,7 @@ void validateToken(Node xml, File txtFile) {
         return
 
     if( validator.validateToken(token, lemma, tags, txtFile) ) {    
-        stats.addToStats(token, lemma, tags)
+        stats.addToStats(token, lemma, tags, txtFile)
     }
 
     validator.validateToken2(token, lemma, tags, txtFile, prevToken)

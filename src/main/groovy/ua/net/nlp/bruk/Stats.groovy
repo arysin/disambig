@@ -9,13 +9,15 @@ class Stats {
     static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
     static final boolean useRightContext = false
-    static final String statsVersion = "3.1.0"
+    static final String statsVersion = "3.1.1"
+    static final Map<String, Integer> CATEGORIES = ["A": 25, "B": 3, "C": 7, "D": 7, "E": 3, "F": 5, "G": 10, "H": 15, "I": 25]
     
     int totalCount = 0
     int ukWordCount = 0
     int wordCount = 0
     int multiTagCount = 0
     boolean sentence = false
+    Map<String, Integer> ukWordCountByCat = [:].withDefault{ 0 }
     Map<String, Integer> freqs = [:].withDefault{ 0 }
     Map<String, Map<WordReading, Map<WordContext, Integer>>> disambigStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
     Map<String, Map<WordReading, Integer>> disambigStatsF = [:].withDefault { [:].withDefault { 0 } }
@@ -52,19 +54,34 @@ class Stats {
     
     
     @CompileStatic
-    void addToStats(String token, String lemma, String tags) {
+    void addToStats(String token, String lemma, String tags, File txtFile) {
         pos1Freq[keyPos(tags)]++
 
         totalCount++
         
         if( UKR_LEMMA.matcher(lemma).matches() ) {
+            String cat = txtFile.name[0]
+            
             ukWordCount++
+            ukWordCountByCat[cat]++
             words[token]++
             wordsNorm[normalize(token, lemma)]++
-            lemmas[lemma]++
+            lemmas[getLemmaKey(lemma, tags)]++
         }
     }
 
+    @CompileStatic
+    static String getLemmaKey(String lemma, String tags) {
+        def m = tags =~ /^[a-z]+(:(([iu]n)?anim|perf|imperf))?/
+        m.find()
+        String key = m.group(0)
+        if( tags.contains("pron") ) 
+            key += "_pron"
+        if( tags.contains(":nv") ) 
+            key += "_nv"
+        return "${lemma}_${key}"
+    }
+    
     @CompileStatic
     static int findCommon(String s1, String s2) {
         int i;
@@ -179,17 +196,28 @@ class Stats {
     }
     
     void writeStats() {
-        println "$totalCount total tokens"
-        println "$ukWordCount Ukrainian tokens"
-        println "$wordCount word/number tokens"
-        println "${words.size()} unique Ukrainian words"
-        println "${wordsNorm.size()} unique Ukrainian words (case-insensitive)"
-        println "${lemmas.size()} unique lemmas"
+        File f = new File("out/stats_disambig.txt")
+        
+        f << "$ukWordCount Ukrainian tokens\n"
+        f << "$totalCount total tokens\n"
+        f << "$wordCount word/number tokens\n"
+        f << "${words.size()} unique Ukrainian words\n"
+        f << "${wordsNorm.size()} unique Ukrainian words (case-insensitive)\n"
+        f << "${lemmas.size()} unique lemmas\n"
     //    println "Tag freqs:\n" + pos1Freq.sort{k,v -> -v}.collect{k,v -> k.padRight(25) + " $v"}.join("\n")
         
     //    println "$multiWordCount multiword tags !!"
         println "$multiTagCount tokens with multiple tags !!"
 
+        int ukWordCountByCatSum = (int)ukWordCountByCat.values().sum(0)
+        
+        f << "\nBy category:\n"
+        ukWordCountByCat.toSorted{ e -> e.getKey() }.each { k,v ->
+            BigDecimal pct = v*100.0/ukWordCountByCatSum
+            pct = pct.round(1)
+            def ct = CATEGORIES[k]
+            f << "$k $v - ${pct} of $ct%\n"
+        }
         
         java.text.Collator coll = java.text.Collator.getInstance(new Locale("uk", "UA"));
         coll.setStrength(java.text.Collator.IDENTICAL)
@@ -206,6 +234,8 @@ class Stats {
             outFile << "$v\t$k\n"
         }
         
+        new File("out/lemmas.txt").text = lemmas.toSorted { e -> - e.getValue() }.collect { k,v -> "$k $v" }.join("\n")
+        
         writeDisambigStats(coll)
     }
      
@@ -217,7 +247,8 @@ class Stats {
         def outFileFreqHom = new File(dir, "lemma_freqs_hom.txt")
         outFileFreqHom.text = "# version: $statsVersion\n"
     
-        println "Ignored for stats:\n\t${ignored.toSorted().join("\n\t")}"
+        //println "Ignored for stats:\n\t${ignored.toSorted().join("\n\t")}"
+        println "Ignored for stats: ${ignored.size()}"
         
         println "Writing ${disambigStats.size()} disambig stats..."
         disambigStats
