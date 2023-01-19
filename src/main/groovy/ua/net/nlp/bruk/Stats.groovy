@@ -106,6 +106,8 @@ class Stats {
         
             assert token, "Empty token at $idx, in $tokenXmls"
     
+            token = ContextToken.normalizeWord(token, lemma, postag)
+            
             WordReading wordReading = new WordReading(lemma, postag)
             disambigStatsF[token][wordReading] += 1
 
@@ -197,6 +199,7 @@ class Stats {
     
     void writeStats() {
         File f = new File("out/stats_disambig.txt")
+        f.text = ''
         
         f << "$ukWordCount Ukrainian tokens\n"
         f << "$totalCount total tokens\n"
@@ -211,7 +214,7 @@ class Stats {
 
         int ukWordCountByCatSum = (int)ukWordCountByCat.values().sum(0)
         
-        f << "\nBy category:\n"
+        f << "\nUkrainian tokens by category:\n"
         ukWordCountByCat.toSorted{ e -> e.getKey() }.each { k,v ->
             BigDecimal pct = v*100.0/ukWordCountByCatSum
             pct = pct.round(1)
