@@ -85,7 +85,7 @@ class Validator {
         if( tags.contains(":prop") && lemma =~ /^[а-яіїєґ]/ 
                 || tags.startsWith("noun") && ! tags.contains(":prop") && ! tags.contains(":abbr") && lemma =~ /^[А-ЯІЇЄҐ]([а-яіїєї].*|$)/ ) {
 //            println "\tInvalid tag: $tags for $token"
-            errValidations[xmlFilename] << "Invalid tag: $tags for $token".toString()
+            errValidations[xmlFilename] << "Invalid tag 2: $tags for $token".toString()
             return false
         }
             

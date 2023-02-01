@@ -8,10 +8,9 @@ import groovy.transform.CompileStatic
 class Stats {
     static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
-    static final boolean useRightContext = false
     static final String statsVersion = "3.1.1"
     static final Map<String, Integer> CATEGORIES = ["A": 25, "B": 3, "C": 7, "D": 7, "E": 3, "F": 5, "G": 10, "H": 15, "I": 25]
-    
+
     int totalCount = 0
     int ukWordCount = 0
     int wordCount = 0
@@ -142,6 +141,9 @@ class Stats {
 
     @CompileStatic
     void addLemmaSuffixStats(String token, String lemma, String postag) {
+        if( ! ( token.toLowerCase() ==~ /[а-яіїєґ']{4,}/) )
+            return
+        
         int lemmaSuffixLen = 4
         if( token.length() > lemmaSuffixLen
                 && postag =~ /^(noun|adj|verb|adv)/
@@ -151,6 +153,8 @@ class Stats {
             if( token.endsWith("ться") ) {
                 lemmaSuffixLen += 2
             }
+            
+            assert lemmaSuffixLen < token.length()
                 
             String adjustedToken = postag =~ /prop|abbr/ ? token : token.toLowerCase()
             String adjustedPostag = postag.replaceAll(/:(xp[0-9]|comp.|&predic|&insert|&numr|&adjp:....:(im)?perf|ua_....)/, '')
@@ -176,6 +180,9 @@ class Stats {
             def lemmaSuffix = "$add/$dropN"
             WordReading wordReadingLemmaSuffix = new WordReading(lemmaSuffix, adjustedPostag)
             def tokenSuffix = adjustedToken[-lemmaSuffixLen..-1]
+            
+            assert tokenSuffix.toLowerCase() ==~ /[а-яіїєґ'-]{4}|[а-яіїєґ']{6}/  
+            
             lemmaSuffixStatsF[tokenSuffix][wordReadingLemmaSuffix] += 1
         }
 
@@ -272,7 +279,7 @@ class Stats {
                         .toSorted{ a, b -> b.getValue().compareTo(a.getValue()) }
                         .each { WordContext wordContext, int value ->
 //                            outFileFreqFull << "  , " << wordContext.toString().padRight(30) << ", " << value << "\n"
-                            if( useRightContext || wordContext.getOffset() == -1 ) {
+                            if( ContextToken.useRightContext(token) || wordContext.getOffset() == -1 ) {
                                 def rateCtx = value / tokenTotalRate
                                 outFileFreqHom << "\t" << wordContext.toString() << "\t\t" << rateCtx << "\n"
                             }
