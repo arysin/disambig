@@ -8,7 +8,7 @@ import groovy.transform.CompileStatic
 class Stats {
     static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
-    static final String statsVersion = "3.1.1"
+    static final String statsVersion = "3.1.2"
     static final Map<String, Integer> CATEGORIES = ["A": 25, "B": 3, "C": 7, "D": 7, "E": 3, "F": 5, "G": 10, "H": 15, "I": 25]
 
     int totalCount = 0

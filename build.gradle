@@ -54,14 +54,6 @@ compileGroovy {
     groovyOptions.forkOptions.jvmArgs = [ '-Dgroovy.grape.enable=false' ]
 }
 
-
-eclipse {
-  classpath {
-    defaultOutputDir = file('build')
-  }
-}
-
-
 test {
     useJUnitPlatform()
     jvmArgs '-Dgroovy.grape.enable=false'
@@ -77,3 +69,30 @@ task run(type: JavaExec) {
   //  args "--properties", propFile
 }
 
+
+boolean nlpUkProjectPresent = new File("${projectDir}/../../spelling/nlp_uk/.project").isFile()
+
+eclipse {
+    classpath {
+      defaultOutputDir = file('build')
+    }
+
+    if( nlpUkProjectPresent ) {
+        classpath {
+            file {
+                //  <classpathentry combineaccessrules="false" kind="src" path="/nlp_uk"/>
+                whenMerged { classpath ->
+                    // TODO: this is hack, should we use configurations instead?
+                    logger.lifecycle "Using local Eclipse dependency for nlp_uk"
+
+
+                    def gwtClasspath = entries.findAll { it.path.contains('nlp_uk') }
+                    entries.removeAll gwtClasspath
+
+                    def genSrc = new org.gradle.plugins.ide.eclipse.model.ProjectDependency('/nlp_uk')
+                    classpath.entries.add(genSrc)
+                }
+            }
+        }
+    }
+}
