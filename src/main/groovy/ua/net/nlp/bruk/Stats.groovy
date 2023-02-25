@@ -10,6 +10,7 @@ class Stats {
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
     static final String statsVersion = "3.1.2"
     static final Map<String, Integer> CATEGORIES = ["A": 25, "B": 3, "C": 7, "D": 7, "E": 3, "F": 5, "G": 10, "H": 15, "I": 25]
+    static final boolean COLLECT_HOMONYMS = false
 
     int totalCount = 0
     int ukWordCount = 0
@@ -29,6 +30,15 @@ class Stats {
     Set<String> homonymTokens = new HashSet<>()
     Set<String> ignored = new HashSet<>()
     Set<String> ignoreForStats
+    
+    // homon stats
+    int ukWordCountWithHom = 0
+    int ukWordCountWithHomLemma = 0
+    int ukWordWordWithHomHomTotalCount = 0
+    int ukWordCountWithHomLemmaTotalCount = 0
+    int ukWordHomTotalCount = 0
+    Map<String, Integer> ukWordHoms = [:].withDefault{ 0 }
+    Validator validator
     
     Stats() {
         if( ! Boolean.getBoolean("full") ) {
@@ -66,6 +76,23 @@ class Stats {
             words[token]++
             wordsNorm[normalize(token, lemma)]++
             lemmas[getLemmaKey(lemma, tags)]++
+            
+            if( COLLECT_HOMONYMS ) {
+                def readings = validator.ukTagger.tag(Arrays.asList(token))[0].getReadings()
+                if( readings.size() > 1 ) {
+                    ukWordCountWithHom += 1
+                    ukWordHoms[readings.toString()] += 1
+                }
+                ukWordWordWithHomHomTotalCount += readings.size()
+
+                def lemmas = readings.collect { it.lemma }.unique()
+                if( lemmas.size() > 1 ) {
+                    ukWordCountWithHomLemma += 1
+                }
+                ukWordCountWithHomLemmaTotalCount += lemmas.size()
+
+                ukWordHomTotalCount += readings.size()
+            }
         }
     }
 
@@ -227,6 +254,17 @@ class Stats {
             pct = pct.round(1)
             def ct = CATEGORIES[k]
             f << "$k $v - ${pct} of $ct%\n"
+        }
+
+        if( COLLECT_HOMONYMS ) {
+            println "words with hom: $ukWordCountWithHom"
+            println "avg hom cnt: ${(double)ukWordHomTotalCount/ukWordCountByCatSum}"
+    //        println "avg hom cnt for word with homonym: ${(double)ukWordWordWithHomHomTotalCount/ukWordCountWithHom}"
+            println "words with hom lemma: $ukWordCountWithHomLemma"
+            println "avg hom lemma cnt per Ukrainian word: ${(double)ukWordCountWithHomLemmaTotalCount/ukWordCountByCatSum}"
+    //        println "avg hom lemma cnt for word with lemma homonym: ${(double)ukWordWordWithHomHomTotalCount/ukWordCountWithHomLemma}"
+            
+            new File("out/homs.txt").text = ukWordHoms.toSorted { e -> -e.value }.collect { e -> "${e.key}  ${e.value}" }.join("\n")
         }
         
         java.text.Collator coll = java.text.Collator.getInstance(new Locale("uk", "UA"));

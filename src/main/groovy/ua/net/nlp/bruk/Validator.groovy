@@ -53,10 +53,12 @@ class Validator {
         allTags += EXTRA_TAGS
         
         def xmlRules = ukrainian.getPatternRules().findAll { Rule r -> 
-            r.getCategory().getId() == CategoryIds.GRAMMAR && r.getId() =~ "(?i)(CONSISTENCY.*NUMERIC|PIVTORA|PRIZVY|LAST_NAME|MODAL)" //|token_agreement_noun_noun)"
+            r.getCategory().getId() == CategoryIds.GRAMMAR && r.getId() =~ "(?i)(CONSISTENCY.*NUMERIC|PIVTORA|PRIZVY|LAST_NAME|MODAL|PREP_BEFORE_VERB)" //|token_agreement_noun_noun)"
         }
         println "Added ${xmlRules.size()} xml rules"
         validationRules += xmlRules
+        
+        stats.validator = this
     }
     
     
@@ -211,6 +213,7 @@ class Validator {
             }
         }
         validateAdjAdj(readings, xmlFileName)
+        validateNounAdj(readings, xmlFileName)
         validateAnd(readings, xmlFileName)
         validateComma(readings, xmlFileName)
     }
@@ -253,7 +256,49 @@ class Validator {
         }
     }
 
+    @CompileStatic
+    void validateNounAdj(List<AnalyzedTokenReadings> readings, String xmlFileName) {
+        
+        for(int ii=1; ii<readings.size(); ii++) {
+            def reading1 = readings.get(ii)
+            def reading0 = readings.get(ii-1)
+            def r1 = reading1.getReadings().get(0)
+            def r0 = reading0.getReadings().get(0)
+
+            def r0POSTag = r0.getPOSTag()
+            def r1POSTag = r1.getPOSTag()
+            
+            if( r0POSTag== null || r1POSTag == null )
+                continue;
+
+//            if( r0POSTag =~ /^numr:.:v_(rod|dav|oru|mis)/ ) {
+//                r0POSTag = r0POSTag.replaceFirst(/^numr/, 'adj')
+//            }
+                            
+            if( r0POSTag.startsWith("noun") && r1POSTag.startsWith("adj") ) {
+                
+                Matcher m0 = r0POSTag =~ /:([mnp]):v_(naz|zna)/
+                Matcher m1 = r1POSTag =~ /:([mnp]):v_(naz|zna)(?!.*pron)/
+                
+                if( ! m0 || ! m1 )
+                    continue
+                if( m0.group(1) != m1.group(1) )
+                    continue
     
+                if( m1.group(2) != m0.group(2) ) {
+//                    if( r0.getToken() =~ /^[0-9]+-[а-яіїєґ]+/
+//                        || (r0POSTag=~ /adjp:pasv:perf/
+//                            && r1POSTag =~ /adj:.:v_oru/)
+//                            || r0.getLemma() =~ /^(який|котрий|кожен)$/
+//                            || CaseGovernmentHelper.hasCaseGovernment(reading0, m1.group(1)) )
+//                        continue
+                    
+                    errValidations[xmlFileName] << "noun-adj: ${r0.getToken()} ${r1.getToken()} -- ${r0.getPOSTag()} ${r1.getPOSTag()}".toString()
+                }
+            }
+        }
+    }
+
     @CompileStatic
     void validateComma(List<AnalyzedTokenReadings> readings, String xmlFileName) {
         
@@ -371,7 +416,9 @@ class Validator {
             .collect{ it.replace('="* ', '="') }
             .join("\n")
 
-        new File("out/err_validations.txt").text = errValidations.toSorted{ e -> e.getKey() }.collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
+        new File("out/err_validations.txt").text = errValidations
+            .toSorted{ e -> e.getKey() }
+            .collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
 
     }    
 }
