@@ -71,7 +71,7 @@ class Validator {
         
         if( tags in EXTRA_TAGS ) {
             if( token != lemma && token != "…" ) {
-                println "\tWrong lemma: $tags for $token"
+//                println "\tWrong lemma: $tags for $token"
                 errValidations[xmlFilename] << "Wrong lemma: $lemma for $token tags: $tags".toString()
             }
         }
