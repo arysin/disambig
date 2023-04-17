@@ -32,17 +32,8 @@ import ua.net.nlp.bruk.Validator
 Stats stats = new Stats()
 @Field
 Validator validator = new Validator(stats)
-@Field
-boolean toTagged = false
-@Field
-Node prevChild = null
-@Field
-boolean quoteOpen
-@Field
-int sentIdx
-@Field
-boolean produceTxt = false
-
+//@Field
+//TxtGenerator txtGenerator
 
 //void main2() {
     @Field
@@ -50,9 +41,6 @@ boolean produceTxt = false
 //    ExecutorService executor = Executors.newFixedThreadPool(8)
 //    List<Future<GPathResult>> futures = new ArrayList<>(100)   // we need to poll for futures in order to keep the queue busy
 
-    File txt2Folder = new File("../txt/gen")
-//    txt2Folder.mkdirs()
-    
     def files = new File("../corpus/data/disambig").listFiles().sort{ it.name }
     files.each { File file->
         if( ! file.name.endsWith('.xml') ) {
@@ -62,14 +50,12 @@ boolean produceTxt = false
             
         println "File: ${file.name}"
         
-        File txtFile = new File(txt2Folder, file.name.replaceFirst(/.xml/, '.txt'))
-//        txtFile.text = ''
-    
-        String inText = file.text
+        File txtFile = new File(file.name.replaceFirst(/.xml/, '.txt'))
     
         String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
         assert new File("txt/orig/$origName").isFile()
-    
+
+        String inText = file.text
         
 //       futures << executor.submit({
             GPathResult xml = new groovy.xml.XmlSlurper().parseText(inText)
@@ -86,10 +72,8 @@ boolean produceTxt = false
 //        def (xml, txtFile) = lst
         
         Iterator<Node> childNodes = xml.childNodes()
-        sentIdx = 0
-        childNodes.eachWithIndex { Node it, int idx ->
-            if( idx == 0 ) prevChild = it
-            processItem(txtFile, it, idx)
+        childNodes.each { Node it ->
+            processItem(txtFile, it)
         }
     }
     
@@ -108,30 +92,15 @@ boolean produceTxt = false
 // end
 
 
-
 @CompileStatic
-static boolean needsSpace(Node prevChild) {
-    return prevChild != null && \
-        (prevChild.name() != "format" || ((String)prevChild.attributes()['tag']).startsWith("/")) \
-            && ! (((String)prevChild.attributes()['value']) ==~ /[°\/]/)
-}
-
-
-@CompileStatic
-private void processItem(File txtFile, Node xml, int childIdx) {
+private void processItem(File txtFile, Node xml) {
     Iterator<Node> childNodes = xml.childNodes()
     
     if( xml.name() == "sentence" ) {
-//        if( sentIdx > 0 && needsSpace(prevChild) ) {
-//            txtFile << " "
-//        }
-        childIdx = 0
-        sentIdx++
-
         List<Node> tokenXmls = new ArrayList<>()
         
-        childNodes.eachWithIndex { Node it, int idx2 ->
-            processItem(txtFile, it, idx2)
+        childNodes.each { Node it ->
+            processItem(txtFile, it)
             if( it.name() == "token" ) {
                 tokenXmls << it
             }
@@ -147,92 +116,18 @@ private void processItem(File txtFile, Node xml, int childIdx) {
             && ! ((Node)childNodes[0]).name() == "alts" ) {
         String xmlName = xml.name()
         
-//        txtFile << "<$xmlName>"
-
-        childNodes.eachWithIndex { Node it, int idx2 -> 
-            processItem(txtFile, it, idx2)
+        childNodes.each { Node it -> 
+            processItem(txtFile, it)
         }
-
-//        txtFile << "</$xmlName>"
     }
     else {
         String xmlName = xml.name()
-
-//        if( xmlName.contains("format") ) {
-//            xmlName = xml.attributes()['tag']
-//            if( ((Node)xml).attributes()['tag'] == 'br' ) {
-//                txtFile << "\n"
-//                prevChild = null
-//                childIdx = 0
-//                return
-//            }
-//
-//            if( childIdx > 0 
-//                    && prevChild != null 
-//                    && prevChild.name() != 'format'
-//                    && ! (prevChild.attributes()['value'] ==~ /[«\u201C(\[]/) 
-//                    && ! ((String)xml.attributes()['tag']).startsWith("/") ) {
-//                txtFile << " "
-//            }
-//            
-//            txtFile << "<$xmlName>"
-//            prevChild = xml
-//            return
-//        }
-        printNode(txtFile, xml, childIdx)
-    } 
-}
-
-@Field
-static final Pattern PUNCT_PATTERN = Pattern.compile(/[.!?,»\u201D)\]%\/:;…]|[.!?]{2,3}/) // (\.,»…\)\]|[.!?]{3})/)
-
-@CompileStatic
-private void printNode(File txtFile, Node node, int childIdx) {
-    if( node.text() || node.parent().name()=="meta" ) {
-//        txtFile << "<${node.name()}>${node.text()}</${node.name()}>\n"
-    }
-    else if( node.name() == "token" ) {
-        if( produceTxt ) {
-            String nodeValue = node.attributes()['value'].toString()
-            if( nodeValue == '"' ) quoteOpen = ! quoteOpen
-            if( childIdx > 0 
-                    && ! PUNCT_PATTERN.matcher(nodeValue).matches()
-                    && prevChild != null 
-                    && ! (prevChild.attributes()['value'] ==~ /[«\u201C\/(\[$]/) 
-                    && needsSpace(prevChild) ) {
-                if( childIdx == 1 && prevChild.attributes()['value'] ==~ /…|\.{3}/ ) {
-                    
-                }
-                else {
-                    if( prevChild.attributes()['value'] == '"' && quoteOpen ) {
-                    }
-                    else if( nodeValue == '"' && ! quoteOpen ) {
-                    }
-                    else 
-                    txtFile << " "
-                }
-            } 
-            txtFile << nodeValue
+        if( xmlName == "token" ) {
+            validateToken(xml, txtFile)
         }
-        
-        validateToken(node, txtFile)
     }
-    else {
-//        String attrs = ((Node)node).attributes().collect { k,v -> "$k=\"$v\"" }.join(" ")
-//        if( attrs ) attrs = " " + attrs
-//
-//        if( node.name() == "paragraph" ) {
-//           txtFile << "\n\n" 
-//           prevChild = null
-//           quoteOpen = false
-//           childIdx = 0
-//           sentIdx = 0
-//        }
-//        else {
-//            txtFile << "<${node.name()}$attrs/>"
-//        }
-    }
-    prevChild = node
+    
+//   txtGenerator.printNode(txtFile, xml, childIdx)
 }
 
 
