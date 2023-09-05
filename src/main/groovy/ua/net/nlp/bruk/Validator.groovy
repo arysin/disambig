@@ -183,7 +183,10 @@ class Validator {
     void validateSentence(List<Node> xmls, File txtFile) {
         def xmlFileName = txtFile.name.replace('.txt', '.xml')
         int pos = 0
-        def readings = xmls.collect { Node xml ->
+        List<AnalyzedTokenReadings> readings = []
+        readings << new AnalyzedTokenReadings(Arrays.asList(new AnalyzedToken('', JLanguageTool.SENTENCE_START_TAGNAME, '')), 0)
+        
+        xmls.each { Node xml ->
             def attributes = xml.attributes()
             String tags = attributes['tags']
             String lemma = attributes['lemma']
@@ -193,12 +196,22 @@ class Validator {
                 tags = null
             }
             
+            boolean whitespaceBefore = false
+            if( pos > 0 && tags != null ) {
+                readings << new AnalyzedTokenReadings(new AnalyzedToken(' ', null, null), pos)
+                pos += 1
+                whitespaceBefore = true
+            }
+            
             def tokens = Arrays.asList(new AnalyzedToken(token, tags, lemma))
             def atr = new AnalyzedTokenReadings(tokens, pos)
-            pos += token.length() + 1
-            atr
+            if( whitespaceBefore ) {
+                atr.setWhitespaceBefore(" ")
+            }
+            readings << atr
+            pos += token.length()
         }
-        readings.add(0, new AnalyzedTokenReadings(Arrays.asList(new AnalyzedToken('', JLanguageTool.SENTENCE_START_TAGNAME, '')), 0))
+        
         AnalyzedSentence sent = new AnalyzedSentence(readings.toArray(new AnalyzedTokenReadings[0]))
         
         validationRules.each { rule ->
