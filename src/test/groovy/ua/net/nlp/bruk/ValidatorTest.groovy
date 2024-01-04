@@ -132,6 +132,16 @@ String str4 =
   <token value="батьківських" lemma="батьківський" tags="adj:p:v_rod" />
 </text>
 """
+
+    @Test
+    void test71AdjAdj() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str71)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        validator.validateSentence(nodes, new File("1.txt"))
+        
+        assertEquals 0, validator.errValidations.size()
+    }
     
     String str72 =
 """
@@ -142,16 +152,6 @@ String str4 =
 """
 
     @Test
-    void test7AdjAdj() {
-        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str71)
-        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
-        
-        validator.validateSentence(nodes, new File("1.txt"))
-        
-        assertEquals 0, validator.errValidations.size()
-    }
-    
-    @Test
     void test72AdjAdj() {
         GPathResult xml = new groovy.xml.XmlSlurper().parseText(str72)
         List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
@@ -161,6 +161,26 @@ String str4 =
         assertEquals 1, validator.errValidations.size()
     }
     
+    String str73 =
+"""
+<text>
+    <token value="до" lemma="до" tags="prep" />
+    <token value="порядку" lemma="порядок" tags="noun:inanim:m:v_dav" />
+    <token value="денного" lemma="денний" tags="adj:m:v_rod" />
+    <token value="нинішньої" lemma="нинішній" tags="adj:f:v_rod" />
+</text>
+"""
+
+    @Test
+    void test73AdjAdj() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str73)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        validator.validateSentence(nodes, new File("1.txt"))
+        
+        assertEquals 1, validator.errValidations.size()
+    }
+
     String str8 =
 """
 <text>
@@ -176,7 +196,7 @@ String str4 =
         
         validator.validateSentence(nodes, new File("1.txt"))
         
-        assertEquals 0, validator.errValidations.size()
+        assertEquals 1, validator.errValidations.size(), validator.errValidations.toString()
     }
 
 }

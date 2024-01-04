@@ -39,7 +39,7 @@ class Validator {
         new TokenAgreementAdjNounRule(messages, ukrainian),
         new TokenAgreementNumrNounRule(messages, ukrainian),
         new TokenAgreementPrepNounRule(messages, ukrainian),
-        new TokenAgreementVerbNounRule(messages),
+        new TokenAgreementVerbNounRule(messages, ukrainian),
         ]
     Stats stats
     
@@ -225,6 +225,9 @@ class Validator {
                 errValidations[xmlFileName] << "$it\n\t\t$sample".toString()
             }
         }
+        
+        readings.removeIf{AnalyzedTokenReadings t -> ! t.getReadings()[0].lemma } // remove SENT_START and spaces
+        
         validateAdjAdj(readings, xmlFileName)
         validateNounAdj(readings, xmlFileName)
         validateAnd(readings, xmlFileName)
