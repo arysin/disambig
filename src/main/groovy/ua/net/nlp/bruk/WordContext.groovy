@@ -5,7 +5,7 @@ import groovy.transform.CompileStatic
 
 @CompileStatic
 @Canonical
-class WordContext {
+public class WordContext {
     ContextToken contextToken
     int offset
     

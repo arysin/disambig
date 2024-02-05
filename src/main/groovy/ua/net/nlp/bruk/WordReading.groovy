@@ -5,7 +5,7 @@ import groovy.transform.CompileStatic
 
 @CompileStatic
 @Canonical
-class WordReading {
+public class WordReading {
     String lemma
     String postag
     
