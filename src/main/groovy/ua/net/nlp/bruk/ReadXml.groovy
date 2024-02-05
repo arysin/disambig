@@ -24,6 +24,7 @@ import org.languagetool.rules.RuleMatch
 import org.languagetool.AnalyzedSentence
 import org.languagetool.JLanguageTool
 
+import ua.net.nlp.bruk.ContextToken
 import ua.net.nlp.bruk.Stats
 import ua.net.nlp.bruk.Validator
 
@@ -41,6 +42,8 @@ Validator validator = new Validator(stats)
 //    ExecutorService executor = Executors.newFixedThreadPool(8)
 //    List<Future<GPathResult>> futures = new ArrayList<>(100)   // we need to poll for futures in order to keep the queue busy
 
+    def txtWordCount = 0 
+    
     def files = new File("../corpus/data/disambig").listFiles().sort{ it.name }
     files.each { File file->
         if( ! file.name.endsWith('.xml') ) {
@@ -53,8 +56,13 @@ Validator validator = new Validator(stats)
         File txtFile = new File(file.name.replaceFirst(/.xml/, '.txt'))
     
         String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
-        assert new File("txt/orig/$origName").isFile()
+        assert new File("../corpus/data/so-so/$origName").isFile() || new File("../corpus/data/good/$origName").isFile()
 
+        def text = new File("../corpus/data/so-so/$origName").isFile() ? new File("../corpus/data/so-so/$origName").text : new File("../corpus/data/good/$origName").text 
+        def text0 = text.replaceAll('СхідSide|ГолосUA|Фirtka|ОsтаNNя|sovieticus’а|Iн-Iв-IIв-IIн-IVн-IVв-IIIв-IIIн-Vн-Vв', 'ААА')
+        def words = text0 =~ /(?ui)[а-яіїєґ][а-яіїєґa-z0-9\u0301'’ʼ\/\u2013-]*/
+        txtWordCount += words.size()
+        
         String inText = file.text
         
 //       futures << executor.submit({
@@ -85,6 +93,8 @@ Validator validator = new Validator(stats)
     stats.writeStats()
     long tm2 = System.currentTimeMillis()
     println "stats took ${tm2-tm1}"
+    
+    println "txt words: ${txtWordCount}"
 //} 
 
 //new ReadXml().main2()

@@ -5,7 +5,7 @@ import groovy.xml.slurpersupport.Node
 import groovy.transform.CompileStatic
 
 @CompileStatic
-class Stats {
+public class Stats {
     static final Pattern MAIN_POS = Pattern.compile(/^(noun|adj|verb|advp?|prep|conj|numr|part|onomat|intj|noninfl)/)
     static final Pattern UKR_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґ].*/)
     static final String statsVersion = "3.2.1"
@@ -14,7 +14,8 @@ class Stats {
 
     int totalCount = 0
     int ukWordCount = 0
-    int wordCount = 0
+    public int wordCount = 0
+    public int alphaWordCount = 0
     int multiTagCount = 0
     boolean sentence = false
     Map<String, Integer> ukWordCountByCat = [:].withDefault{ 0 }
@@ -27,7 +28,7 @@ class Stats {
     Map<String, Integer> wordsNorm = [:].withDefault{ 0 }
     Map<String, Integer> lemmas = [:].withDefault{ 0 }
     Map<String, Integer> pos1Freq = [:].withDefault{ 0 }
-    Set<String> homonymTokens = new HashSet<>()
+    public Set<String> homonymTokens = new HashSet<>()
     Set<String> ignored = new HashSet<>()
     Set<String> ignoreForStats
     
@@ -238,6 +239,7 @@ class Stats {
         f << "$ukWordCount Ukrainian tokens\n"
         f << "$totalCount total tokens\n"
         f << "$wordCount word/number tokens\n"
+        f << "$alphaWordCount alpha word tokens\n"
         f << "${words.size()} unique Ukrainian words\n"
         f << "${wordsNorm.size()} unique Ukrainian words (case-insensitive)\n"
         f << "${lemmas.size()} unique lemmas\n"

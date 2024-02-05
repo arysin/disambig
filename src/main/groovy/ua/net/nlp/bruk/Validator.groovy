@@ -24,8 +24,9 @@ import org.languagetool.tagging.uk.UkrainianTagger
 import groovy.transform.CompileStatic
 import groovy.xml.slurpersupport.Node
 
-class Validator {
+public class Validator {
     static final Pattern WORD_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґa-z0-9].*/)
+    static final Pattern ALPHA_WORD_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґa-z].*/)
     static final List<String> EXTRA_TAGS = [ 'punct', 'number', 'number:latin', 'time', 'date', 'unclass', 'unknown', 'symb', 'hashtag' ]
     
     def lt = new JLanguageTool(Languages.getLanguageForShortCode("uk"), [], null, null, null, null)
@@ -118,6 +119,11 @@ class Validator {
     void validateToken2(String token, String lemma, String postag, File txtFile, ContextToken prevToken) {
         if( WORD_LEMMA.matcher(lemma).matches() ) {
             stats.wordCount++
+            
+            if( ALPHA_WORD_LEMMA.matcher(lemma).matches() ) {
+                stats.alphaWordCount++
+            }
+            
             if( postag == "null" ) {
                 System.err.println "null tag for $token"
             }
