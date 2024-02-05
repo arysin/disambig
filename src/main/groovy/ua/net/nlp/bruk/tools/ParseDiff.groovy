@@ -14,7 +14,7 @@ Map<String, Set<Object>> lemmaChg = [:].withDefault { new HashSet<>() }
 
 List<String> benchFiles = new File("ignore_for_stats.txt").readLines().collect{ it.replace('.txt', '') }
 
-new File(".").eachFile { File f ->
+new File("test-data").eachFile { File f ->
     if( ! benchFiles.find { f.name.startsWith(it) } ) {
         return
     }
@@ -112,7 +112,7 @@ println "zna/naz: " + tagChg.findAll { e -> e.key =~ /naz.*zna|zna.*naz/ }.colle
 new File("zz_diff_lemma.txt").text = lemmaChg.toSorted{ e -> -e.value.size() }
     .collect{ k,v ->
         def vv = v.collect{ "${it.ctxPrev}\n\t${it.minus}\n\t${it.plus}\n${it.ctxNext}"}.join("\n---\n\t")
-        "$k\n\t$vv" 
+        "$k - ${v.size()}\n\t$vv" 
      }.join("\n")
 
 
