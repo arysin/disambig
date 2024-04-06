@@ -1,6 +1,6 @@
 #!/bin/env groovy
 
-package ua.net.nlp.bruk
+package ua.net.nlp.bruk.tools
 
 import groovy.transform.Canonical
 import groovy.transform.CompileStatic
@@ -25,8 +25,8 @@ import org.languagetool.AnalyzedSentence
 import org.languagetool.JLanguageTool
 
 import ua.net.nlp.bruk.ContextToken
-import ua.net.nlp.bruk.Stats
-import ua.net.nlp.bruk.Validator
+import ua.net.nlp.bruk.tools.Stats
+import ua.net.nlp.bruk.tools.Validator
 import ua.net.nlp.tools.tag.TagTextCore
 
 

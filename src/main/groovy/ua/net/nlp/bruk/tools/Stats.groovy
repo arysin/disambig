@@ -1,9 +1,12 @@
-package ua.net.nlp.bruk
+package ua.net.nlp.bruk.tools
 
 import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 import java.util.regex.Pattern
 import groovy.xml.slurpersupport.Node
+import ua.net.nlp.bruk.ContextToken
+import ua.net.nlp.bruk.WordContext
+import ua.net.nlp.bruk.WordReading
 import groovy.transform.CompileStatic
 
 @CompileStatic

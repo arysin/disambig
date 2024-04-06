@@ -1,4 +1,4 @@
-package ua.net.nlp.bruk;
+package ua.net.nlp.bruk.tools;
 
 import java.io.File;
 import java.util.regex.Pattern;

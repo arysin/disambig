@@ -1,4 +1,4 @@
-package ua.net.nlp.bruk
+package ua.net.nlp.bruk.tools
 
 import java.util.regex.Matcher
 import java.util.regex.Pattern
@@ -23,6 +23,7 @@ import org.languagetool.tagging.uk.UkrainianTagger
 
 import groovy.transform.CompileStatic
 import groovy.xml.slurpersupport.Node
+import ua.net.nlp.bruk.ContextToken
 
 public class Validator {
     static final Pattern WORD_LEMMA = Pattern.compile(/(?iu)^[а-яіїєґa-z0-9].*/)
