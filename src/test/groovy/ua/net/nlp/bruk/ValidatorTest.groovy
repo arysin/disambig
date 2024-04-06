@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 
 class ValidatorTest {
-    def validator = new Validator(new Stats())
+    def validator = new Validator()
     
     String str=
 """

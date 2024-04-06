@@ -27,113 +27,123 @@ import org.languagetool.JLanguageTool
 import ua.net.nlp.bruk.ContextToken
 import ua.net.nlp.bruk.Stats
 import ua.net.nlp.bruk.Validator
+import ua.net.nlp.tools.tag.TagTextCore
 
 
 @Field
 Stats stats = new Stats()
 @Field
-Validator validator = new Validator(stats)
-//@Field
-//TxtGenerator txtGenerator
-
-//void main2() {
-    @Field
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-//    ExecutorService executor = Executors.newFixedThreadPool(8)
-//    List<Future<GPathResult>> futures = new ArrayList<>(100)   // we need to poll for futures in order to keep the queue busy
-
-    def txtWordCount = 0 
+Validator validator = new Validator()
+@Field
+ExecutorService executor = Executors.newWorkStealingPool()
+@Field
+static final String DATA_DIR = "../corpus/data/disambig"
+@Field
+int txtWordCount = 0
     
-    def files = new File("../corpus/data/disambig").listFiles().sort{ it.name }
-    files.each { File file->
-        if( ! file.name.endsWith('.xml') ) {
-            System.err.println "Unknown file: ${file.name}"
-            return
-        }
-            
-        println "File: ${file.name}"
-        
-        File txtFile = new File(file.name.replaceFirst(/.xml/, '.txt'))
-    
-        String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
-        assert new File("../corpus/data/so-so/$origName").isFile() || new File("../corpus/data/good/$origName").isFile()
 
-        def text = new File("../corpus/data/so-so/$origName").isFile() ? new File("../corpus/data/so-so/$origName").text : new File("../corpus/data/good/$origName").text 
-        def text0 = text.replaceAll('СхідSide|ГолосUA|Фirtka|ОsтаNNя|sovieticus’а|Iн-Iв-IIв-IIн-IVн-IVв-IIIв-IIIн-Vн-Vв', 'ААА')
-        def words = text0 =~ /(?ui)[а-яіїєґ][а-яіїєґa-z0-9\u0301'’ʼ\/\u2013-]*/
-        txtWordCount += words.size()
-        
-        String inText = file.text
-        
-//       futures << executor.submit({
-            GPathResult xml = new groovy.xml.XmlSlurper().parseText(inText)
-//            return [xml, txtFile]
-//        } as Callable<List>)
-        
-//        txtFile << "\n"
-//    }
+TagTextCore.printLtVersion()
 
-//    println "Got ${futures.size()} futures"
-    
-//    futures.each { Future xmlF ->
-//        def lst = xmlF.get()
-//        def (xml, txtFile) = lst
-        
-        Iterator<Node> childNodes = xml.childNodes()
-        childNodes.each { Node it ->
-            processItem(txtFile, it)
-        }
+def files = new File(DATA_DIR).listFiles().sort{ it.name }
+files.each { File file->
+    if( ! file.name.endsWith('.xml') ) {
+        System.err.println "Unknown file: ${file.name}"
+        return
     }
-    
-    executor.shutdown()
-    executor.awaitTermination(30, TimeUnit.SECONDS)
-    
-    validator.writeErrors()
-    long tm1 = System.currentTimeMillis()
-    stats.writeStats()
-    long tm2 = System.currentTimeMillis()
-    println "stats took ${tm2-tm1}"
-    
-    println "txt words: ${txtWordCount}"
-//} 
 
-//new ReadXml().main2()
+    //println "File: ${file.name}"
 
-// end
+    File txtFile = new File(file.name.replaceFirst(/.xml/, '.txt'))
 
+    String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
+    assert new File("../corpus/data/so-so/$origName").isFile() || new File("../corpus/data/good/$origName").isFile()
+
+    executor.submit{
+        processFile(file, origName)
+    }
+}
+
+println "Submitted ${files.size()} files"
+
+executor.shutdown()
+executor.awaitTermination(30, TimeUnit.SECONDS)
+
+validator.writeErrors()
+long tm1 = System.currentTimeMillis()
+stats.writeStats()
+long tm2 = System.currentTimeMillis()
+println "write stats took ${tm2-tm1}ms"
+
+println "txt words: ${txtWordCount}"
+
+Thread.sleep(500)
+exe("/bin/bash -e out/z_diff.sh")
+
+// end main
+
+    
+@CompileStatic
+private void processFile(File file, String origName) {
+    Stats localStats = new Stats(validator: validator)
+    
+    def text = new File("../corpus/data/so-so/$origName").isFile() ? new File("../corpus/data/so-so/$origName").text : new File("../corpus/data/good/$origName").text
+    def text0 = text.replaceAll('СхідSide|ГолосUA|Фirtka|ОsтаNNя|sovieticus’а|Iн-Iв-IIв-IIн-IVн-IVв-IIIв-IIIн-Vн-Vв', 'ААА')
+    def words = text0 =~ /(?ui)[а-яіїєґ][а-яіїєґa-z0-9\u0301'’ʼ\/\u2013-]*/
+//    txtWordCount += words.size()
+    int count = 0;
+    while (words.find()) {
+        count++
+    }
+    txtWordCount += count
+    
+    String inText = file.text
+    
+    GPathResult xml = new groovy.xml.XmlSlurper().parseText(inText)
+    
+    Iterator<Node> childNodes = xml.childNodes()
+    childNodes.each { Node node ->
+        processItem(file, node, localStats)
+    }
+
+//    println "adding local stats for ${file.name}"
+    try {
+        stats.add(localStats)
+    }
+    catch(e) {
+        e.printStackTrace()
+        System.exit(1)
+    }
+}
 
 @CompileStatic
-private void processItem(File txtFile, Node xml) {
+private void processItem(File file, Node xml, Stats stats) {
     Iterator<Node> childNodes = xml.childNodes()
     
     if( xml.name() == "sentence" ) {
         List<Node> tokenXmls = new ArrayList<>()
         
         childNodes.each { Node it ->
-            processItem(txtFile, it)
+            processItem(file, it, stats)
             if( it.name() == "token" ) {
                 tokenXmls << it
             }
         }
 
-        executor.execute {  
-            validator.validateSentence(tokenXmls, txtFile)
-            stats.generateStats(tokenXmls, txtFile)
-        } as Runnable
-        
+        validator.validateSentence(tokenXmls, file)
+        stats.generateStats(tokenXmls, file)
     }
     else if( childNodes
             && ! ((Node)childNodes[0]).name() == "alts" ) {
         String xmlName = xml.name()
         
         childNodes.each { Node it -> 
-            processItem(txtFile, it)
+            processItem(file, it, stats)
         }
     }
     else {
         String xmlName = xml.name()
         if( xmlName == "token" ) {
-            validateToken(xml, txtFile)
+            validateToken(xml, file, stats)
         }
     }
     
@@ -142,10 +152,15 @@ private void processItem(File txtFile, Node xml) {
 
 
 @Field
-ContextToken prevToken = new ContextToken('', '', '')
-
+ThreadLocal<ContextToken> prevToken = 
+    new ThreadLocal<ContextToken>() {
+        public ContextToken initialValue() {
+          return new ContextToken('', '', '')
+        }
+      }
+  
 @CompileStatic
-void validateToken(Node xml, File txtFile) {
+void validateToken(Node xml, File file, Stats stats) {
     def attributes = xml.attributes()
     String tags = attributes['tags']
     String lemma = attributes['lemma']
@@ -154,12 +169,22 @@ void validateToken(Node xml, File txtFile) {
     if( tags in ['xmltag'] )
         return
 
-    if( validator.validateToken(token, lemma, tags, txtFile) ) {    
-        stats.addToStats(token, lemma, tags, txtFile)
+    if( validator.validateToken(token, lemma, tags, file) ) {    
+        stats.addToStats(token, lemma, tags, file)
     }
 
-    validator.validateToken2(token, lemma, tags, txtFile, prevToken)
+    validator.validateToken2(token, lemma, tags, file, prevToken.get(), stats)
     
-    prevToken = new ContextToken(token, lemma, tags)
+    prevToken.set(new ContextToken(token, lemma, tags))
 }
 
+
+def exe(cmd) {
+    def sout = new StringBuilder(), serr = new StringBuilder()
+    def proc = cmd.execute()
+    proc.waitForProcessOutput(sout, serr)
+//    proc.consumeProcessOutput(sout, serr)
+//    proc.waitForOrKill(2000)
+    println "out> $sout"
+    System.err.println "err> $serr"
+}

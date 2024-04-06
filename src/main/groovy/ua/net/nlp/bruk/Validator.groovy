@@ -33,7 +33,7 @@ public class Validator {
     def ukrainian = lt.getLanguage()
 //    @Lazy
     UkrainianTagger ukTagger = ukrainian.getTagger()
-    Set<String> allTags
+    static Set<String> allTags
     ResourceBundle messages = JLanguageTool.getDataBroker().getResourceBundle(JLanguageTool.MESSAGE_BUNDLE, new Locale("uk"))
     List<org.languagetool.rules.Rule> validationRules = 
         [new TokenAgreementNounVerbRule(messages),
@@ -42,41 +42,49 @@ public class Validator {
         new TokenAgreementPrepNounRule(messages, ukrainian),
         new TokenAgreementVerbNounRule(messages, ukrainian),
         ]
-    Stats stats
     
-    Map<String, List<String>> errValidations = [:].withDefault{ [] }
-    List<String> errUnverified = []
-    
+    Map<String, List<String>> errValidations = Collections.synchronizedMap([:].withDefault{ [] })
+    List<String> errUnverified = Collections.synchronizedList([])
 
-    Validator(Stats stats) {
-        this.stats = stats
-        allTags = getClass().getResource('/org/languagetool/resource/uk/ukrainian_tags.txt').readLines() as Set
+    static {
+        allTags = Validator.class.getResource('/org/languagetool/resource/uk/ukrainian_tags.txt').readLines() as Set
         allTags += EXTRA_TAGS
-        
+    }    
+
+    Validator() {
         def xmlRules = ukrainian.getPatternRules().findAll { Rule r -> 
             r.getCategory().getId() == CategoryIds.GRAMMAR && r.getId() =~ "(?i)(CONSISTENCY.*NUMERIC|PIVTORA|PRIZVY|LAST_NAME|MODAL|PREP_BEFORE_VERB)" //|token_agreement_noun_noun)"
         }
         println "Added ${xmlRules.size()} xml rules"
         validationRules += xmlRules
-        
-        stats.validator = this
     }
     
     
     @CompileStatic
-    boolean validateToken(String token, String lemma, String tags, File txtFile) {
+    boolean validateToken(String token, String lemma, String tags, File file) {
         assert tags, "no tags for token $token"
         assert lemma != null, "no lemma for token $token"
         
-        def xmlFilename = txtFile.name.replace('.txt', '.xml')
+        def xmlFilename = file.name
         
-        if( tags in EXTRA_TAGS ) {
+        List<String> tagSet = tags.split(/:/) as List
+        if( EXTRA_TAGS.intersect(tagSet) ) {
             if( token != lemma && token != "…" ) {
 //                println "\tWrong lemma: $tags for $token"
                 errValidations[xmlFilename] << "Wrong lemma: $lemma for $token tags: $tags".toString()
             }
         }
-        
+
+        if( tags =~ /:bad/ ) {
+            def tkns = ukTagger.tag([token])[0].getReadings()
+                    .findAll { AnalyzedToken it ->
+                        it.lemma == lemma \
+                        && it.POSTag.startsWith(tags.replaceFirst(/:.*/, '')) }
+            if( tkns && tkns.find { it.POSTag.contains(":bad") } == null ) {
+                errValidations[xmlFilename] << "Bad with no bad lemma, maybe subst?: $lemma for $token tags: $tags".toString()
+            }
+        }
+
         if( ! (tags in allTags) && ! (tags.replaceAll(/:(alt|bad|short)/, '') in allTags) ) {
             if( ! ( tags =~ /noninfl(:foreign)?:prop|noun:anim:p:v_zna:var|noun:anim:[mfp]:v_...:nv:abbr:prop:[fp]name/ ) ) {
 //                println "\tInvalid tag: $tags for $token"
@@ -112,11 +120,16 @@ public class Validator {
     //        System.err.println "Invalid tag: $tags"
     //        return
     //    }
-    
     }
-    
+
     @CompileStatic
-    void validateToken2(String token, String lemma, String postag, File txtFile, ContextToken prevToken) {
+    synchronized
+    AnalyzedTokenReadings tag(String token) {
+        ukTagger.tag([token])[0]
+    }
+        
+    @CompileStatic
+    void validateToken2(String token, String lemma, String postag, File file, ContextToken prevToken, Stats stats) {
         if( WORD_LEMMA.matcher(lemma).matches() ) {
             stats.wordCount++
             
@@ -133,8 +146,8 @@ public class Validator {
             else {
                 if( postag == "part" && token ==~ /-(бо|но|то|от|таки)/ && token == "-" + lemma )
                     return
-                
-                AnalyzedTokenReadings ltTags = ukTagger.tag([token])[0]
+
+                AnalyzedTokenReadings ltTags = tag(token)
                 
                 if( ltTags.getReadings().size() > 1 ) {
                     stats.homonymTokens << token
@@ -160,7 +173,7 @@ public class Validator {
 //                }
             }
             
-            String xmlFileName = txtFile.name.replace('.txt', '.xml')
+            String xmlFileName = file.name
             
             if( postag =~ /.*:p:v_naz.*/ ) {
                 if( prevToken.word.toLowerCase() == "є" && prevToken.postag =~ /:s:3/ ) {
@@ -186,8 +199,7 @@ public class Validator {
     }
     
     @CompileStatic
-    void validateSentence(List<Node> xmls, File txtFile) {
-        def xmlFileName = txtFile.name.replace('.txt', '.xml')
+    void validateSentence(List<Node> xmls, File file) {
         int pos = 0
         List<AnalyzedTokenReadings> readings = []
         readings << new AnalyzedTokenReadings(Arrays.asList(new AnalyzedToken('', JLanguageTool.SENTENCE_START_TAGNAME, '')), 0)
@@ -228,16 +240,16 @@ public class Validator {
                 if( fromPos < 0 ) fromPos = 0 
                 sample = sample[fromPos..-1]
 //                println "\trule violation: $it\n\t$sample"
-                errValidations[xmlFileName] << "$it\n\t\t$sample".toString()
+                errValidations[file.name] << "$it\n\t\t$sample".toString()
             }
         }
         
         readings.removeIf{AnalyzedTokenReadings t -> ! t.getReadings()[0].lemma } // remove SENT_START and spaces
         
-        validateAdjAdj(readings, xmlFileName)
-        validateNounAdj(readings, xmlFileName)
-        validateAnd(readings, xmlFileName)
-        validateComma(readings, xmlFileName)
+        validateAdjAdj(readings, file.name)
+        validateNounAdj(readings, file.name)
+        validateAnd(readings, file.name)
+        validateComma(readings, file.name)
     }
     
     @CompileStatic

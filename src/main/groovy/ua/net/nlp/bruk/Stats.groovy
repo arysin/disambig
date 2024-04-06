@@ -1,5 +1,7 @@
 package ua.net.nlp.bruk
 
+import java.lang.reflect.Field
+import java.lang.reflect.Modifier
 import java.util.regex.Pattern
 import groovy.xml.slurpersupport.Node
 import groovy.transform.CompileStatic
@@ -17,20 +19,22 @@ public class Stats {
     public int wordCount = 0
     public int alphaWordCount = 0
     int multiTagCount = 0
-    boolean sentence = false
     Map<String, Integer> ukWordCountByCat = [:].withDefault{ 0 }
-    Map<String, Integer> freqs = [:].withDefault{ 0 }
+    Map<String, Integer> freqCounts = [:].withDefault{ 0 }
+    Map<String, Integer> wordCounts = [:].withDefault{ 0 }
+    Map<String, Integer> wordsNormCounts = [:].withDefault{ 0 }
+    Map<String, Integer> lemmaCounts = [:].withDefault{ 0 }
+    Map<String, Integer> pos1Freq = [:].withDefault{ 0 }
+    Map<String, Integer> ukWordHoms = [:].withDefault{ 0 }
+    
     Map<String, Map<WordReading, Map<WordContext, Integer>>> disambigStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
     Map<String, Map<WordReading, Integer>> disambigStatsF = [:].withDefault { [:].withDefault { 0 } }
-//    Map<String, Map<WordReading, Map<WordContext, Integer>>> lemmaSuffixStats = [:].withDefault { [:].withDefault { [:].withDefault { 0 } }}
     Map<String, Map<WordReading, Integer>> lemmaSuffixStatsF = [:].withDefault { [:].withDefault { 0 } }
-    Map<String, Integer> words = [:].withDefault{ 0 }
-    Map<String, Integer> wordsNorm = [:].withDefault{ 0 }
-    Map<String, Integer> lemmas = [:].withDefault{ 0 }
-    Map<String, Integer> pos1Freq = [:].withDefault{ 0 }
+
     public Set<String> homonymTokens = new HashSet<>()
     Set<String> ignored = new HashSet<>()
-    Set<String> ignoreForStats
+
+    static Set<String> ignoreForStats = new HashSet()
     
     // homon stats
     int ukWordCountWithHom = 0
@@ -38,12 +42,11 @@ public class Stats {
     int ukWordWordWithHomHomTotalCount = 0
     int ukWordCountWithHomLemmaTotalCount = 0
     int ukWordHomTotalCount = 0
-    Map<String, Integer> ukWordHoms = [:].withDefault{ 0 }
     Validator validator
     
-    Stats() {
+    static {
         if( ! Boolean.getBoolean("full") ) {
-            ignoreForStats = getClass().getResource('/ignore_for_stats.txt').readLines().findAll { it && ! it.startsWith('#') } as Set
+            ignoreForStats = Stats.class.getResource('/ignore_for_stats.txt').readLines().findAll { it && ! it.startsWith('#') } as Set
             println "Ignoring for stats: ${ignoreForStats.size()} files"
         }
     }
@@ -64,6 +67,7 @@ public class Stats {
     
     
     @CompileStatic
+    synchronized
     void addToStats(String token, String lemma, String tags, File txtFile) {
         pos1Freq[keyPos(tags)]++
 
@@ -74,9 +78,9 @@ public class Stats {
             
             ukWordCount++
             ukWordCountByCat[cat]++
-            words[token]++
-            wordsNorm[normalize(token, lemma)]++
-            lemmas[getLemmaKey(lemma, tags)]++
+            wordCounts[token]++
+            wordsNormCounts[normalize(token, lemma)]++
+            lemmaCounts[getLemmaKey(lemma, tags)]++
             
             if( COLLECT_HOMONYMS ) {
                 def readings = validator.ukTagger.tag(Arrays.asList(token))[0].getReadings()
@@ -120,9 +124,9 @@ public class Stats {
     }
         
     @CompileStatic
-    void generateStats(List<Node> tokenXmls, File txtFile) {
-        if( (txtFile.name in ignoreForStats) ) {
-            ignored << txtFile.name
+    void generateStats(List<Node> tokenXmls, File file) {
+        if( (file.name.replaceFirst(/\.xml$/, '.txt') in ignoreForStats) ) {
+            ignored << file.name
             return
         }
     
@@ -141,7 +145,7 @@ public class Stats {
             addLemmaSuffixStats(token, lemma, postag)
 
             if( postag != null && MAIN_POS.matcher(postag).find() ) {
-                freqs[lemma] += 1
+                freqCounts[lemma] += 1
                 
     //            def currCtxToken = ContextToken.normalized(token, lemma, postag)
                 
@@ -191,7 +195,7 @@ public class Stats {
                 commonLength = findCommon(token, lemma)
 //                    assert commonLength, token
                 if( commonLength < 2 ) {
-                        println "skipping for lemma suffixes: $token"
+//                    println "skipping for lemma suffixes: $token"
                     return
                 }
             }
@@ -233,6 +237,8 @@ public class Stats {
     }
     
     void writeStats() {
+        println "Writing stats"
+        
         File f = new File("out/stats_disambig.txt")
         f.text = ''
         
@@ -240,9 +246,9 @@ public class Stats {
         f << "$totalCount total tokens\n"
         f << "$wordCount word/number tokens\n"
         f << "$alphaWordCount alpha word tokens\n"
-        f << "${words.size()} unique Ukrainian words\n"
-        f << "${wordsNorm.size()} unique Ukrainian words (case-insensitive)\n"
-        f << "${lemmas.size()} unique lemmas\n"
+        f << "${wordCounts.size()} unique Ukrainian words\n"
+        f << "${wordsNormCounts.size()} unique Ukrainian words (case-insensitive)\n"
+        f << "${lemmaCounts.size()} unique lemmas\n"
     //    println "Tag freqs:\n" + pos1Freq.sort{k,v -> -v}.collect{k,v -> k.padRight(25) + " $v"}.join("\n")
         
     //    println "$multiWordCount multiword tags !!"
@@ -275,16 +281,23 @@ public class Stats {
 
         // write stats
             
-        freqs = freqs.toSorted { - it.value }
+        freqCounts = freqCounts.toSorted { - it.value }
         
         def outFile = new File("out/lemma_freqs.txt")
         outFile.text = ""
         
-        freqs.each { k,v ->
+        freqCounts.each { k,v ->
             outFile << "$v\t$k\n"
         }
         
-        new File("out/lemmas.txt").text = lemmas.toSorted { e -> - e.getValue() }.collect { k,v -> "$k $v" }.join("\n")
+        def outFileW = new File("out/word_freqs.txt")
+        outFileW.text = ""
+        
+        wordCounts.each { k,v ->
+            outFileW << "$v\t$k\n"
+        }
+        
+        new File("out/lemmas.txt").text = lemmaCounts.toSorted { e -> - e.getValue() }.collect { k,v -> "$k $v" }.join("\n")
         
         writeDisambigStats(coll)
     }
@@ -304,7 +317,8 @@ public class Stats {
         disambigStats
             .toSorted { a, b -> coll.compare a.getKey(), b.getKey() }
             .each { String token, Map<WordReading, Map<WordContext, Integer>> map1 ->
-                double tokenTotalRate = Double.valueOf(((Integer)disambigStatsF[token].values().sum()))
+                double tokenTotalRate = Double.valueOf(((Integer)disambigStatsF[token].values().sum(0)))
+                assert tokenTotalRate, "for $token"
                 
                 map1
                 .toSorted{ a, b -> b.getKey().getPostag().compareTo(a.getKey().getPostag()) }
@@ -356,5 +370,58 @@ public class Stats {
     //        int uniqFormsSumMain = freqs2Main.collect{ k,v -> v.values().sum(0) }.sum(0)
     //        int uniqFormsWithHomSumMain = freqs2WithHomsMain.collect{ k,v -> v.values().sum(0) }.sum(0)
     //        println "Total uniq forms main: ${uniqFormsSumMain}, with homonyms: ${uniqFormsWithHomSumMain}, ${(double)uniqFormsWithHomSumMain/uniqFormsSumMain}"
+    }
+
+    static final List<Field> FIELDS = Stats.class.getDeclaredFields() \
+        .findAll{ f -> ! Modifier.isStatic(f.getModifiers()) && !(f.name ==~ /validator|metaClass/) }
+    
+    @CompileStatic
+    synchronized
+    void add(Stats newStats) {
+        int updated = 0
+        def fields = FIELDS.findAll{ f -> f.setAccessible(true); f.get(newStats) != null }
+//        println "fields: ${fields.size()}"
+        fields.each { field ->
+            if( int.class.isAssignableFrom(field.getType()) ) {
+                def val = ((Integer)field.get(this)) + (Integer)field.get(newStats)
+                field.set(this, val)
+            }
+            else if( Collection.class.isAssignableFrom(field.getType()) ) {
+                ((Collection)field.get(this)).addAll( (Collection)field.get(newStats) )
+            }
+            else if( Map.class.isAssignableFrom(field.getType()) ) {
+                def newMap = (Map)field.get(newStats)
+                def totalMap = (Map)field.get(this)
+                
+//                System.err.println("summing ${field.name}")
+                addMapCounts(field, (Map)field.get(this), newMap)
+            }
+            else {
+                println "WARNING: ignoring ${field.name} in Stats.add()"
+            }
+        }
+    }
+
+    private static void addMapCounts(Field field, Map totalMap, Map newMap) {
+        if( newMap.isEmpty() )
+            return
+
+        def firstValue = ((Map.Entry)newMap.iterator().next()).getValue()
+        
+        if( firstValue instanceof Integer ) {
+            newMap.each{ k,v ->
+                if( v ) {
+                    ((Map<?, Integer>)totalMap)[k] += (Integer)v
+                }
+            }
+        }
+        else if( firstValue instanceof Map ) {
+            newMap.each { k,v ->
+                addMapCounts(field, totalMap[k], (Map)v)
+            }
+        }
+        else {
+            println "WARN: unknown map for ${field.name}"
+        }
     }
 }
