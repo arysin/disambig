@@ -14,16 +14,17 @@ repositories {
     mavenLocal()
 }
 
+boolean nlpUkProjectPresent = new File("${projectDir}/../../spelling/nlp_uk/.project").isFile()
+
 
 dependencies {
     implementation group: groovyGroup, name: 'groovy', version: groovyVersion
-//    implementation group: groovyGroup, name: 'groovy-json', version: groovyVersion
     implementation group: groovyGroup, name: 'groovy-xml', version: groovyVersion
 
     implementation group:'ch.qos.logback', name:'logback-classic', version:'1.4.+'
-    implementation group: 'org.apache.commons', name: 'commons-csv', version: '1.9.0'
+    implementation group: 'org.apache.commons', name: 'commons-csv', version: '1.10.0'
 
-    implementation("org.languagetool:language-uk:$ltUkVersion") {
+    implementation("org.languagetool:language-uk:$ltDevVersion") {
         exclude module: 'hunspell'
         exclude module: 'language-detector'
         exclude module: 'lucene-core'
@@ -33,9 +34,13 @@ dependencies {
     if( project.hasProperty('morfologik_ukrainian_lt_version') ) {
         implementation("ua.net.nlp:morfologik-ukrainian-lt:${morfologik_ukrainian_lt_version}")
     }
+    
+    if( ! nlpUkProjectPresent ) {
+      implementation group:'ua.net.nlp', name:'nlp_uk', version:'3+'
+    }
 
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.+'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.+'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.+'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.+'
 }
 
 sourceSets {
@@ -69,8 +74,6 @@ task run(type: JavaExec) {
   //  args "--properties", propFile
 }
 
-
-boolean nlpUkProjectPresent = new File("${projectDir}/../../spelling/nlp_uk/.project").isFile()
 
 eclipse {
     classpath {
