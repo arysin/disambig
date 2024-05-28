@@ -14,6 +14,9 @@ Map<String, Set<Object>> lemmaChg = [:].withDefault { new HashSet<>() }
 
 List<String> benchFiles = new File("ignore_for_stats.txt").readLines().collect{ it.replace('.txt', '') }
 
+def errFile = new File("zDiff.err")
+errFile.text = ''
+
 new File("test-data").eachFile { File f ->
     if( ! benchFiles.find { f.name.startsWith(it) } ) {
         return
@@ -77,7 +80,7 @@ new File("test-data").eachFile { File f ->
             }
             else {
                 def p = parse(plus)
-                println "\tno match: $p"
+                errFile << "\tno - for +: $p (${f.name})\n"
                 lastPlus = null
             }
             ctxPrev = ''
@@ -100,8 +103,8 @@ new File("test-data").eachFile { File f ->
 }
 
 println "Total -: $minusCnt (of $totalCnt - ${minusCnt*100/totalCnt}%, words: $totalWordCnt)"
-println "Lemmas: $lemmaCnt (${lemmaCnt*100d/minusCnt}%) - (${lemmaCnt*100d/totalCnt}%)"
-println "Lemma/POS: $lemmaPosCnt (${lemmaPosCnt*100d/minusCnt}%) - (${lemmaPosCnt*100d/totalCnt}%)"
+println "Lemmas: $lemmaCnt (${lemmaCnt*100d/minusCnt}%) - (${100 - lemmaCnt*100d/totalCnt}%)"
+println "Lemma/POS: $lemmaPosCnt (${lemmaPosCnt*100d/minusCnt}%) - (${100 - lemmaPosCnt*100d/totalCnt}%)"
 println "Tags: $tagCnt (${tagCnt*100d/minusCnt}%)"
 
 new File("zz_diff_tag.txt").text = tagChg.toSorted{ e -> -e.value }
