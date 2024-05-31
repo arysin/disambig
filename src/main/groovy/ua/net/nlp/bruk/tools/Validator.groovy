@@ -311,16 +311,29 @@ public class Validator {
 //            }
                             
             if( r0POSTag.startsWith("noun") && r1POSTag.startsWith("adj") ) {
-                
-                Matcher m0 = r0POSTag =~ /:([mnp]):v_(naz|zna)/
-                Matcher m1 = r1POSTag =~ /:([mnp]):v_(naz|zna)(?!.*pron)/
+
+                Matcher m0 = r0POSTag =~ /:([mnp]):v_(...)/
+                Matcher m1 = r1POSTag =~ /:([mnp]):v_(...)(?!.*pron)/
                 
                 if( ! m0 || ! m1 )
                     continue
-                if( m0.group(1) != m1.group(1) )
-                    continue
-    
-                if( m1.group(2) != m0.group(2) ) {
+                    
+                def gen0 = m0.group(1)
+                def gen1 = m1.group(1)
+                def case0 = m0.group(2)
+                def case1 = m1.group(2)
+                
+                if( gen0 != gen1 ) {
+                    if( reading0.getCleanToken() == "плюс" )
+                        continue
+                        
+                    if( case0 == case1 
+                        && ! (case1 =~ /rod/) ) {
+                        errValidations[xmlFileName] << "noun-adj: ${r0.getToken()} ${r1.getToken()} -- ${r0.getPOSTag()} ${r1.getPOSTag()}".toString()
+                    }
+                }
+                else if( case0 =~ /(naz|zna)/ && case1 =~ /(naz|zna)/ 
+                         && case0 != case1 ) {
 //                    if( r0.getToken() =~ /^[0-9]+-[а-яіїєґ]+/
 //                        || (r0POSTag=~ /adjp:pasv:perf/
 //                            && r1POSTag =~ /adj:.:v_oru/)
@@ -333,6 +346,7 @@ public class Validator {
             }
         }
     }
+
 
     @CompileStatic
     void validateComma(List<AnalyzedTokenReadings> readings, String xmlFileName) {
