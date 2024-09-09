@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVPrinter
+import org.apache.commons.lang3.StringUtils
 import org.languagetool.AnalyzedToken
 import org.languagetool.AnalyzedTokenReadings
 import org.languagetool.tagging.uk.UkrainianTagger
@@ -53,11 +54,19 @@ files.each { File file->
 
     //println "File: ${file.name}"
 
-    File txtFile = new File(file.name.replaceFirst(/.xml/, '.txt'))
+    String origName = file.name.replaceFirst(/\.xml$/, '.txt')
 
-    String origName = txtFile.getName() //.replaceFirst(/_dis\.txt/, '.txt')
-    assert new File("../corpus/data/so-so/$origName").isFile() || new File("../corpus/data/good/$origName").isFile()
+    def sosoFile = new File("../corpus/data/so-so/$origName")
+    def goodFile = new File("../corpus/data/good/$origName")
+    assert sosoFile.isFile() || goodFile.isFile()
 
+//    File txtFile = sosoFile.isFile() ? sosoFile : goodFile  
+//    
+//    int xmlCnt = StringUtils.countMatches(file.text.replaceAll(/.*? value="(.*?)" .*/, '$1'), '\u201C')
+//    int txtCnt = StringUtils.countMatches(txtFile.text, '\u201C')
+//    
+//    assert xmlCnt == txtCnt, "U+201C does not match in ${file.name}"
+    
     executor.submit{
         processFile(file, origName)
     }

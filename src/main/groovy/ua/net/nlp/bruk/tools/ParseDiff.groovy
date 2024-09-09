@@ -107,6 +107,10 @@ println "Lemmas: $lemmaCnt (${lemmaCnt*100d/minusCnt}%) - (${100 - lemmaCnt*100d
 println "Lemma/POS: $lemmaPosCnt (${lemmaPosCnt*100d/minusCnt}%) - (${100 - lemmaPosCnt*100d/totalCnt}%)"
 println "Tags: $tagCnt (${tagCnt*100d/minusCnt}%)"
 
+new File("stats.inc") << "stats[\"err_lemma\"]=$lemmaCnt\n"
+new File("stats.inc") << "stats[\"err_lemma_pos\"]=$lemmaPosCnt\n"
+
+
 new File("zz_diff_tag.txt").text = tagChg.toSorted{ e -> -e.value }
     .collect{ k,v -> "$k : $v" }.join("\n")
 
@@ -118,7 +122,38 @@ new File("zz_diff_lemma.txt").text = lemmaChg.toSorted{ e -> -e.value.size() }
         "$k - ${v.size()}\n\t$vv" 
      }.join("\n")
 
+// prepare lemma matrix
+     
+def columns = [] as LinkedHashSet
+Map<String, Map<String, Integer>> lemmaMatrix = [:]
+lemmaChg.toSorted{ e -> -e.value.size() }
+    .collect { k, v ->
+        def (left, right) = k.split(" -> ")
+        lemmaMatrix.computeIfAbsent(left, {[:]})[right] = v.size()
+        columns << right
+    }
 
+def matrixFile = new File("zz_lemma_matrix.csv")
+matrixFile.text = ''
+
+
+columns.each { c ->
+    matrixFile << ",$c"
+}
+matrixFile << "\n"
+
+lemmaMatrix.each { k,v ->
+    matrixFile << k
+    
+    columns.each { c ->
+        def val = lemmaMatrix[k][c] ?: "" 
+        matrixFile << ",$val"
+    }
+    
+    matrixFile << "\n"
+}
+
+    
 def parse(String l) {
     def m = l =~ /value="(.+?)" lemma="(.+?)" tags="(.+?)"/
     m.find()

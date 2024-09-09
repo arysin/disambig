@@ -200,5 +200,24 @@ String str4 =
         
         assertEquals 1, validator.errValidations.size(), validator.errValidations.toString()
     }
+    
+    String str9 =
+"""
+<text>
+  <token value="їв" lemma="їсти" tags="verb:imperf:past:m" />
+  <token value="таки" lemma="таки" tags="part" />
+  <token value="танку" lemma="танк" tags="noun:inanim:m:v_dav" />
+</text>
+"""
+    
+    @Test
+    void test9() {
+        GPathResult xml = new groovy.xml.XmlSlurper().parseText(str9)
+        List<groovy.xml.slurpersupport.Node> nodes = xml.childNodes().collect { it }
+        
+        validator.validateSentence(nodes, new File("1.txt"))
+        println ":: ${validator.errValidations}"
+        assertEquals 1, validator.errValidations.size(), validator.errValidations.toString()
+    }
 
 }
