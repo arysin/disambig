@@ -34,7 +34,7 @@ dependencies {
     if( project.hasProperty('morfologik_ukrainian_lt_version') ) {
         implementation("ua.net.nlp:morfologik-ukrainian-lt:${morfologik_ukrainian_lt_version}")
     }
-    
+
     if( ! nlpUkProjectPresent ) {
       implementation group:'ua.net.nlp', name:'nlp_uk', version:'3+'
     }
@@ -67,7 +67,7 @@ test {
 
 task run(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = "ua.net.nlp.bruk.ReadXml"
+    mainClass = "ua.net.nlp.bruk.tools.ReadXml"
 
     jvmArgs '-Dgroovy.grape.enable=false'
 
