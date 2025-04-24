@@ -10,7 +10,8 @@ int lemmaCnt = 0
 int lemmaPosCnt = 0
 int tagCnt = 0
 Map<String, Integer> tagChg = [:].withDefault { 0 }
-Map<String, Set<Object>> lemmaChg = [:].withDefault { new HashSet<>() }
+Map<String, Set<Object>> lemmaChg = [:].withDefault { new ArrayList<>() }
+Map<String, Set<Object>> lemmaPosChg = [:].withDefault { new ArrayList<>() }
 
 List<String> benchFiles = new File("ignore_for_stats.txt").readLines().collect{ it.replace('.txt', '') }
 
@@ -24,7 +25,7 @@ new File("test-data").eachFile { File f ->
     
     if( f.name ==~ /[A-I]_.*\.xml/ && ! f.name.endsWith('.tagged.xml') ) {
         totalCnt += f.readLines().count{  it.contains("<token") }
-        totalWordCnt += f.readLines().count{  it =~ /(?iu)<token value="[а-яіїєґ]/ }
+        totalWordCnt += f.readLines().count{  it =~ /(?iu)<token value="[а-яіїєґ]/ } // "
         return
     }
 
@@ -64,12 +65,17 @@ new File("test-data").eachFile { File f ->
 //                    println "\t$m\n\t$p"
                     lastPlus = ['minus': m, 'plus': p, 'ctxPrev': ctxPrev]
                     lemmaChg[ "${m[1]} -> ${p[1]}" ] << lastPlus 
+                    
                     lemmaCnt++
                     
                     lemmaPosCnt++
                 }
                 else {
-                    if( m[2].split(':')[0] != p[2].split(':')[0] ) {
+                    def lemmaPosMinus = m[1] + "_" + m[2].split(':')[0]
+                    def lemmaPosPlus = p[1] + "_" + p[2].split(':')[0]
+                    
+                    if( lemmaPosMinus != lemmaPosPlus && ! lemmaPosPlus.contains("unknown") ) {
+                        lemmaPosChg[ "${lemmaPosMinus} -> ${lemmaPosPlus}" ] << lastPlus 
                         lemmaPosCnt++
                     }
                 }
@@ -102,10 +108,14 @@ new File("test-data").eachFile { File f ->
     }
 }
 
-println "Total -: $minusCnt (of $totalCnt - ${minusCnt*100/totalCnt}%, words: $totalWordCnt)"
-println "Lemmas: $lemmaCnt (${lemmaCnt*100d/minusCnt}%) - (${100 - lemmaCnt*100d/totalCnt}%)"
-println "Lemma/POS: $lemmaPosCnt (${lemmaPosCnt*100d/minusCnt}%) - (${100 - lemmaPosCnt*100d/totalCnt}%)"
-println "Tags: $tagCnt (${tagCnt*100d/minusCnt}%)"
+def fmtPct(n) {
+  String.format('%.02f', n)
+}
+
+println "Total -: $minusCnt (of ${totalCnt} - ${fmtPct(100.0 - minusCnt*100.0/totalCnt)}%, words: $totalWordCnt)"
+println "Lemmas: $lemmaCnt (${fmtPct(lemmaCnt*100d/minusCnt)}%) - (${fmtPct(100 - lemmaCnt*100d/totalWordCnt)}%) - tokens: ${fmtPct(100 - lemmaCnt*100d/totalCnt)}%"
+println "Lemma/POS: $lemmaPosCnt (${fmtPct(lemmaPosCnt*100d/minusCnt)}%) - (${fmtPct(100 - lemmaPosCnt*100d/totalWordCnt)}%) - tokens: ${fmtPct(100 - lemmaPosCnt*100d/totalCnt)}%"
+println "Tags: $tagCnt (${fmtPct(tagCnt*100d/minusCnt)}%)"
 
 new File("stats.inc") << "stats[\"err_lemma\"]=$lemmaCnt\n"
 new File("stats.inc") << "stats[\"err_lemma_pos\"]=$lemmaPosCnt\n"
@@ -122,35 +132,43 @@ new File("zz_diff_lemma.txt").text = lemmaChg.toSorted{ e -> -e.value.size() }
         "$k - ${v.size()}\n\t$vv" 
      }.join("\n")
 
+
+
 // prepare lemma matrix
+
+prepareMatrix(lemmaChg, "zz_lemma_matrix.csv")
+prepareMatrix(lemmaPosChg, "zz_lemma_pos_matrix.csv")
+
+def prepareMatrix(map, filename) {
      
-def columns = [] as LinkedHashSet
-Map<String, Map<String, Integer>> lemmaMatrix = [:]
-lemmaChg.toSorted{ e -> -e.value.size() }
-    .collect { k, v ->
-        def (left, right) = k.split(" -> ")
-        lemmaMatrix.computeIfAbsent(left, {[:]})[right] = v.size()
-        columns << right
-    }
-
-def matrixFile = new File("zz_lemma_matrix.csv")
-matrixFile.text = ''
-
-
-columns.each { c ->
-    matrixFile << ",$c"
-}
-matrixFile << "\n"
-
-lemmaMatrix.each { k,v ->
-    matrixFile << k
+    def columns = [] as LinkedHashSet
+    Map<String, Map<String, Integer>> lemmaMatrix = [:]
+    map.toSorted{ e -> -e.value.size() }
+        .collect { k, v ->
+            def (left, right) = k.split(" -> ")
+            lemmaMatrix.computeIfAbsent(left, {[:]})[right] = v.size()
+            columns << right
+        }
+    
+    def matrixFile = new File(filename)
+    matrixFile.text = ''
     
     columns.each { c ->
-        def val = lemmaMatrix[k][c] ?: "" 
-        matrixFile << ",$val"
+        matrixFile << ",$c"
     }
-    
     matrixFile << "\n"
+    
+    lemmaMatrix.each { k,v ->
+        matrixFile << k
+        
+        columns.each { c ->
+            def val = lemmaMatrix[k][c] ?: "" 
+            matrixFile << ",$val"
+        }
+        
+        matrixFile << "\n"
+    }
+
 }
 
     
