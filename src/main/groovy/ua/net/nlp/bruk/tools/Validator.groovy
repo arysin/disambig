@@ -6,6 +6,7 @@ import java.util.regex.Pattern
 import org.languagetool.AnalyzedSentence
 import org.languagetool.AnalyzedToken
 import org.languagetool.AnalyzedTokenReadings
+import org.languagetool.GlobalConfig
 import org.languagetool.JLanguageTool
 import org.languagetool.Languages
 import org.languagetool.language.Ukrainian
@@ -19,7 +20,9 @@ import org.languagetool.rules.uk.TokenAgreementNounVerbRule
 import org.languagetool.rules.uk.TokenAgreementNumrNounRule
 import org.languagetool.rules.uk.TokenAgreementPrepNounRule
 import org.languagetool.rules.uk.TokenAgreementVerbNounRule
+import org.languagetool.tagging.disambiguation.uk.UkrainianHybridDisambiguator
 import org.languagetool.tagging.uk.UkrainianTagger
+import org.languagetool.tokenizers.uk.UkrainianWordTokenizer
 
 import groovy.transform.CompileStatic
 import groovy.xml.slurpersupport.Node
@@ -34,6 +37,9 @@ public class Validator {
     def ukrainian = lt.getLanguage()
 //    @Lazy
     UkrainianTagger ukTagger = ukrainian.getTagger()
+    UkrainianHybridDisambiguator ukDisambiguator = ukrainian.getDisambiguator()
+    //UkrainianWordTokenizer ukWordTokenizer = ukrainian.getWordTokenizer()
+    
     static Set<String> allTags
     ResourceBundle messages = JLanguageTool.getDataBroker().getResourceBundle(JLanguageTool.MESSAGE_BUNDLE, new Locale("uk"))
     List<org.languagetool.rules.Rule> validationRules = 
@@ -46,10 +52,13 @@ public class Validator {
     
     Map<String, List<String>> errValidations = Collections.synchronizedMap([:].withDefault{ [] })
     List<String> errUnverified = Collections.synchronizedList([])
-
+    List<String> errDisambig = Collections.synchronizedList([])
+    
     static {
         allTags = Validator.class.getResource('/org/languagetool/resource/uk/ukrainian_tags.txt').readLines() as Set
         allTags += EXTRA_TAGS
+        
+        GlobalConfig.setVerbose(true)
     }    
 
     Validator() {
@@ -77,7 +86,7 @@ public class Validator {
         }
 
         if( tags =~ /:bad/ ) {
-            def tkns = ukTagger.tag([token])[0].getReadings()
+            def tkns = tag(token).getReadings()
                     .findAll { AnalyzedToken it ->
                         it.lemma == lemma \
                         && it.POSTag.startsWith(tags.replaceFirst(/:.*/, '')) }
@@ -126,7 +135,8 @@ public class Validator {
     @CompileStatic
     synchronized
     AnalyzedTokenReadings tag(String token) {
-        ukTagger.tag([token])[0]
+        def readin = ukTagger.tag([token])[0]
+//        ukDisambiguator.disambiguate(null)
     }
         
     @CompileStatic
@@ -164,7 +174,7 @@ public class Validator {
 //                {
                     boolean initials = token ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\./ && tagPair ==~ /[А-ЯІЇЄҐ][а-яіїєґ]?\.\/noun:anim:[mf]:v_...:nv:abbr:prop:[fp]name/
                     if( ! (tagPair in ltTags2) && ! initials ) {
-                        if( token != "їх" || ! (postag ==~ /adj:[mfnp]:v_...(:r(in)?anim)?:nv:&pron:pos:bad/ ) ) {
+                        if( token != "їх" || ! (postag ==~ /adj:[mfnp]:v_...(:r(in)?anim)?:nv:pron:pos:bad/ ) ) {
                             
                             errUnverified << "value=\"$token\" lemma=\"${tagPair.replace('/', '\" tags=\"')}\"  (avail: $ltTags2)".toString()
                     //                            println "Unverified tag: $tagPair (token: $token) (avail: $ltTags2)"
@@ -205,11 +215,15 @@ public class Validator {
         List<AnalyzedTokenReadings> readings = []
         readings << new AnalyzedTokenReadings(Arrays.asList(new AnalyzedToken('', JLanguageTool.SENTENCE_START_TAGNAME, '')), 0)
         
+        List<String> wordTokens = []
+        
         xmls.each { Node xml ->
             def attributes = xml.attributes()
             String tags = attributes['tags']
             String lemma = attributes['lemma']
             String token = attributes['value']
+            
+            wordTokens << token
             
             if( tags =~ /unclass|punct|unknown|symbol/ ) {
                 tags = null
@@ -233,10 +247,30 @@ public class Validator {
         
         AnalyzedSentence sent = new AnalyzedSentence(readings.toArray(new AnalyzedTokenReadings[0]))
         
+        List<AnalyzedTokenReadings> taggedSent = ukTagger.tag(wordTokens)
+        taggedSent.add(0, new AnalyzedTokenReadings(Arrays.asList(new AnalyzedToken('', JLanguageTool.SENTENCE_START_TAGNAME, '')), 0))
+        AnalyzedSentence finalSentence = new AnalyzedSentence(taggedSent.toArray(new AnalyzedTokenReadings[0]));
+        AnalyzedSentence disambigSentence = ukDisambiguator.disambiguate(finalSentence)
+        
+        readings.findAll{ it.readings[0].token != ' ' }.eachWithIndex { r, i ->
+            def disambigR = disambigSentence.getTokens()[i].readings
+            def taggedR = taggedSent[i].readings
+            def xmlR = r.readings[0]
+            if( disambigR[0].POSTag != null ) {
+                if( ! disambigR.find{ it.getPOSTag() == xmlR.getPOSTag() && it.getLemma() == xmlR.getLemma() } ) {
+                   if( taggedR.find { it.getPOSTag() == xmlR.getPOSTag() && it.getLemma() == xmlR.getLemma() } ) {  
+                       //System.err.println "No disambig match: $r in dis: ($disambigR)\n\t$wordTokens"
+                       def annotations = disambigSentence.getTokens()[i].getHistoricalAnnotations()?.indent(4) //[0]. disambigSentence.annotations.indent(4)
+                       errDisambig << "$r in dis: ($disambigR)\n\t$wordTokens\n\t${annotations}".toString()
+                   }
+                }
+            }
+        }
+        
         validationRules.each { rule ->
             RuleMatch[] matches = rule.match(sent)
+            def sample = wordTokens.join(' ')
             matches.each {
-                def sample = xmls.collect{it.attributes()['value']}.join(' ')
                 int fromPos = it.fromPos - 15
                 if( fromPos < 0 ) fromPos = 0 
                 sample = sample[fromPos..-1]
@@ -468,6 +502,10 @@ public class Validator {
         new File("out/err_validations.txt").text = errValidations
             .toSorted{ e -> e.getKey() }
             .collect { k,v -> "$k\n\t" + v.join("\n\t") }.join("\n")
-
+            
+        new File("out/err_disambig.txt").text = errDisambig
+            .toSorted(coll)
+            .join("\n")
+    
     }    
 }

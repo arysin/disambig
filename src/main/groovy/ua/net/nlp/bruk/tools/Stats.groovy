@@ -192,7 +192,7 @@ public class Stats {
             assert lemmaSuffixLen < token.length()
                 
             String adjustedToken = postag =~ /prop|abbr/ ? token : token.toLowerCase()
-            String adjustedPostag = postag.replaceAll(/:(xp[0-9]|comp.|&predic|&insert|&numr|&adjp:....:(im)?perf|ua_....)/, '')
+            String adjustedPostag = postag.replaceAll(/:(xp[0-9]|comp.|predic|insert|numr|adjp:....:(im)?perf|up..)/, '')
             int commonLength = findCommon(adjustedToken, lemma)
             if( commonLength == 0 ) {
                 commonLength = findCommon(token, lemma)

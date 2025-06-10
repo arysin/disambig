@@ -35,7 +35,7 @@ dependencies {
         implementation("ua.net.nlp:morfologik-ukrainian-lt:${morfologik_ukrainian_lt_version}")
     }
 
-    if( ! nlpUkProjectPresent ) {
+    if( project.gradle.startParameter.getTaskNames().contains('run') || ! nlpUkProjectPresent ) {
       implementation group:'ua.net.nlp', name:'nlp_uk', version:'3+'
     }
 

@@ -10,8 +10,9 @@ int lemmaCnt = 0
 int lemmaPosCnt = 0
 int tagCnt = 0
 Map<String, Integer> tagChg = [:].withDefault { 0 }
-Map<String, Set<Object>> lemmaChg = [:].withDefault { new ArrayList<>() }
-Map<String, Set<Object>> lemmaPosChg = [:].withDefault { new ArrayList<>() }
+Map<String, List<String>> tagChg2 = [:].withDefault { new ArrayList<>() }
+Map<String, List<Object>> lemmaChg = [:].withDefault { new ArrayList<>() }
+Map<String, List<Object>> lemmaPosChg = [:].withDefault { new ArrayList<>() }
 
 List<String> benchFiles = new File("ignore_for_stats.txt").readLines().collect{ it.replace('.txt', '') }
 
@@ -81,6 +82,7 @@ new File("test-data").eachFile { File f ->
                 }
                 if( m[2] != p[2] ) {
                     tagChg[ "${m[2]} -> ${p[2]}" ] += 1
+                    tagChg2[ "${m[2]} -> ${p[2]}" ] << lastPlus
                     tagCnt++
                 }
             }
@@ -125,7 +127,7 @@ new File("zz_diff_tag.txt").text = tagChg.toSorted{ e -> -e.value }
     .collect{ k,v -> "$k : $v" }.join("\n")
 
 println "zna/naz: " + tagChg.findAll { e -> e.key =~ /naz.*zna|zna.*naz/ }.collect { e -> e.value }.sum(0d) 
-    
+
 new File("zz_diff_lemma.txt").text = lemmaChg.toSorted{ e -> -e.value.size() }
     .collect{ k,v ->
         def vv = v.collect{ "${it.ctxPrev}\n\t${it.minus}\n\t${it.plus}\n${it.ctxNext}"}.join("\n---\n\t")
@@ -138,6 +140,7 @@ new File("zz_diff_lemma.txt").text = lemmaChg.toSorted{ e -> -e.value.size() }
 
 prepareMatrix(lemmaChg, "zz_lemma_matrix.csv")
 prepareMatrix(lemmaPosChg, "zz_lemma_pos_matrix.csv")
+prepareMatrix(tagChg2, "zz_tag_matrix.csv")
 
 def prepareMatrix(map, filename) {
      
@@ -175,5 +178,5 @@ def prepareMatrix(map, filename) {
 def parse(String l) {
     def m = l =~ /value="(.+?)" lemma="(.+?)" tags="(.+?)"/
     m.find()
-    [m.group(1), m.group(2), m.group(3).replaceAll(/:comp.|:&amp;predic|:(.n)?anim|:&amp:.*?:(im)?perf/,'')]
+    [m.group(1), m.group(2), m.group(3).replaceAll(/:comp.|:predic|:(.n)?anim|:.*?:(im)?perf/,'')]
 }

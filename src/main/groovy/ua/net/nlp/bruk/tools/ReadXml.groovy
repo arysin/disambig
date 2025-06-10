@@ -185,7 +185,7 @@ void validateToken(Node xml, File file, Stats stats) {
     validator.validateToken2(token, lemma, tags, file, prevToken.get(), stats)
     
     prevToken.set(new ContextToken(token, lemma, tags))
-}
+} 
 
 
 def exe(cmd) {
